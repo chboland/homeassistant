@@ -1,4 +1,5 @@
 """Code to handle a Livisi switches."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -81,7 +82,9 @@ class LivisiSwitch(LivisiEntity, SwitchEntity):
         """Register callbacks."""
         await super().async_added_to_hass()
 
-        response = await self.coordinator.async_get_pss_state(self._capability_id)
+        response = await self.coordinator.async_get_device_state(
+            self._capability_id, "onState"
+        )
         if response is None:
             self._attr_is_on = False
             self._attr_available = False

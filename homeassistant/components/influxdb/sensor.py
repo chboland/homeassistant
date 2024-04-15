@@ -1,4 +1,5 @@
 """InfluxDB component which allows you to get data from an Influx database."""
+
 from __future__ import annotations
 
 import datetime
@@ -13,6 +14,7 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     CONF_API_VERSION,
+    CONF_LANGUAGE,
     CONF_NAME,
     CONF_UNIQUE_ID,
     CONF_UNIT_OF_MEASUREMENT,
@@ -35,7 +37,6 @@ from .const import (
     CONF_FIELD,
     CONF_GROUP_FUNCTION,
     CONF_IMPORTS,
-    CONF_LANGUAGE,
     CONF_MEASUREMENT_NAME,
     CONF_QUERIES,
     CONF_QUERIES_FLUX,
@@ -165,7 +166,7 @@ def setup_platform(
         influx = get_influx_connection(config, test_read=True)
     except ConnectionError as exc:
         _LOGGER.error(exc)
-        raise PlatformNotReady() from exc
+        raise PlatformNotReady from exc
 
     entities = []
     if CONF_QUERIES_FLUX in config:
@@ -339,7 +340,7 @@ class InfluxQLSensorData:
             return
 
         self.query = (
-            f"select {self.group}({self.field}) as {INFLUX_CONF_VALUE} from"
+            f"select {self.group}({self.field}) as {INFLUX_CONF_VALUE} from"  # noqa: S608
             f" {self.measurement} where {where_clause}"
         )
 

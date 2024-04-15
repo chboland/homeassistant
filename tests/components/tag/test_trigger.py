@@ -1,7 +1,8 @@
 """Tests for tag triggers."""
+
 import pytest
 
-import homeassistant.components.automation as automation
+from homeassistant.components import automation
 from homeassistant.components.tag import async_scan_tag
 from homeassistant.components.tag.const import DEVICE_ID, DOMAIN, TAG_ID
 from homeassistant.const import ATTR_ENTITY_ID, SERVICE_TURN_OFF
@@ -9,7 +10,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
 from tests.common import async_mock_service
-from tests.components.blueprint.conftest import stub_blueprint_populate  # noqa: F401
+
+
+@pytest.fixture(autouse=True, name="stub_blueprint_populate")
+def stub_blueprint_populate_autouse(stub_blueprint_populate: None) -> None:
+    """Stub copying the blueprints to the config folder."""
 
 
 @pytest.fixture

@@ -1,4 +1,5 @@
 """Helper methods for common tasks."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -38,15 +39,13 @@ _ReturnFuncType = Callable[Concatenate[_T, _P], _R | None]
 @overload
 def soco_error(
     errorcodes: None = ...,
-) -> Callable[[_FuncType[_T, _P, _R]], _FuncType[_T, _P, _R]]:
-    ...
+) -> Callable[[_FuncType[_T, _P, _R]], _FuncType[_T, _P, _R]]: ...
 
 
 @overload
 def soco_error(
     errorcodes: list[str],
-) -> Callable[[_FuncType[_T, _P, _R]], _ReturnFuncType[_T, _P, _R]]:
-    ...
+) -> Callable[[_FuncType[_T, _P, _R]], _ReturnFuncType[_T, _P, _R]]: ...
 
 
 def soco_error(
@@ -117,3 +116,10 @@ def hostname_to_uid(hostname: str) -> str:
     else:
         raise ValueError(f"{hostname} is not a sonos device.")
     return f"{UID_PREFIX}{baseuid}{UID_POSTFIX}"
+
+
+def sync_get_visible_zones(soco: SoCo) -> set[SoCo]:
+    """Ensure I/O attributes are cached and return visible zones."""
+    _ = soco.household_id
+    _ = soco.uid
+    return soco.visible_zones

@@ -1,4 +1,5 @@
 """Config flow for MQTT."""
+
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -6,15 +7,20 @@ from collections.abc import Callable
 import queue
 from ssl import PROTOCOL_TLS_CLIENT, SSLContext, SSLError
 from types import MappingProxyType
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from cryptography.x509 import load_pem_x509_certificate
 import voluptuous as vol
 
-from homeassistant import config_entries
 from homeassistant.components.file_upload import process_uploaded_file
 from homeassistant.components.hassio import HassioServiceInfo
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
 from homeassistant.const import (
     CONF_CLIENT_ID,
     CONF_DISCOVERY,
@@ -25,8 +31,7 @@ from homeassistant.const import (
     CONF_PROTOCOL,
     CONF_USERNAME,
 )
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.json import json_dumps
 from homeassistant.helpers.selector import (
@@ -47,7 +52,6 @@ from homeassistant.helpers.selector import (
 from homeassistant.util.json import JSON_DECODE_EXCEPTIONS, json_loads
 
 from .client import MqttClientSetup
-from .config_integration import CONFIG_SCHEMA_ENTRY
 from .const import (
     ATTR_PAYLOAD,
     ATTR_QOS,
@@ -155,7 +159,7 @@ CERT_UPLOAD_SELECTOR = FileSelector(
 KEY_UPLOAD_SELECTOR = FileSelector(FileSelectorConfig(accept=".key,application/pkcs8"))
 
 
-class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
+class FlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
     VERSION = 1
@@ -165,14 +169,14 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
+        config_entry: ConfigEntry,
     ) -> MQTTOptionsFlowHandler:
         """Get the options flow for this handler."""
         return MQTTOptionsFlowHandler(config_entry)
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle a flow initialized by the user."""
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
@@ -181,13 +185,13 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_broker(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Confirm the setup."""
         errors: dict[str, str] = {}
         fields: OrderedDict[Any, Any] = OrderedDict()
         validated_user_input: dict[str, Any] = {}
         if await async_get_broker_settings(
-            self.hass,
+            self,
             fields,
             None,
             user_input,
@@ -212,7 +216,9 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="broker", data_schema=vol.Schema(fields), errors=errors
         )
 
-    async def async_step_hassio(self, discovery_info: HassioServiceInfo) -> FlowResult:
+    async def async_step_hassio(
+        self, discovery_info: HassioServiceInfo
+    ) -> ConfigFlowResult:
         """Receive a Hass.io discovery."""
         await self._async_handle_discovery_without_unique_id()
 
@@ -222,10 +228,11 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_hassio_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Confirm a Hass.io discovery."""
         errors: dict[str, str] = {}
-        assert self._hassio_discovery
+        if TYPE_CHECKING:
+            assert self._hassio_discovery
 
         if user_input is not None:
             data: dict[str, Any] = self._hassio_discovery.copy()
@@ -256,28 +263,28 @@ class FlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
 
-class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
+class MQTTOptionsFlowHandler(OptionsFlow):
     """Handle MQTT options."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize MQTT options flow."""
         self.config_entry = config_entry
         self.broker_config: dict[str, str | int] = {}
         self.options = config_entry.options
 
-    async def async_step_init(self, user_input: None = None) -> FlowResult:
+    async def async_step_init(self, user_input: None = None) -> ConfigFlowResult:
         """Manage the MQTT options."""
         return await self.async_step_broker()
 
     async def async_step_broker(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage the MQTT broker configuration."""
         errors: dict[str, str] = {}
         fields: OrderedDict[Any, Any] = OrderedDict()
         validated_user_input: dict[str, Any] = {}
         if await async_get_broker_settings(
-            self.hass,
+            self,
             fields,
             self.config_entry.data,
             user_input,
@@ -304,7 +311,7 @@ class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
 
     async def async_step_options(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage the MQTT options."""
         errors = {}
         current_config = self.config_entry.data
@@ -313,7 +320,8 @@ class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
 
         def _birth_will(birt_or_will: str) -> dict[str, Any]:
             """Return the user input for birth or will."""
-            assert user_input
+            if TYPE_CHECKING:
+                assert user_input
             return {
                 ATTR_TOPIC: user_input[f"{birt_or_will}_topic"],
                 ATTR_PAYLOAD: user_input.get(f"{birt_or_will}_payload", ""),
@@ -369,7 +377,6 @@ class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
                 updated_config = {}
                 updated_config.update(self.broker_config)
                 updated_config.update(options_config)
-                CONFIG_SCHEMA_ENTRY(updated_config)
                 self.hass.config_entries.async_update_entry(
                     self.config_entry,
                     data=updated_config,
@@ -391,9 +398,9 @@ class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
         # build form
         fields: OrderedDict[vol.Marker, Any] = OrderedDict()
         fields[vol.Optional(CONF_DISCOVERY, default=discovery)] = BOOLEAN_SELECTOR
-        fields[
-            vol.Optional(CONF_DISCOVERY_PREFIX, default=discovery_prefix)
-        ] = PUBLISH_TOPIC_SELECTOR
+        fields[vol.Optional(CONF_DISCOVERY_PREFIX, default=discovery_prefix)] = (
+            PUBLISH_TOPIC_SELECTOR
+        )
 
         # Birth message is disabled if CONF_BIRTH_MESSAGE = {}
         fields[
@@ -414,9 +421,9 @@ class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
             )
         ] = TEXT_SELECTOR
         fields[vol.Optional("birth_qos", default=birth[ATTR_QOS])] = QOS_SELECTOR
-        fields[
-            vol.Optional("birth_retain", default=birth[ATTR_RETAIN])
-        ] = BOOLEAN_SELECTOR
+        fields[vol.Optional("birth_retain", default=birth[ATTR_RETAIN])] = (
+            BOOLEAN_SELECTOR
+        )
 
         # Will message is disabled if CONF_WILL_MESSAGE = {}
         fields[
@@ -437,9 +444,9 @@ class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
             )
         ] = TEXT_SELECTOR
         fields[vol.Optional("will_qos", default=will[ATTR_QOS])] = QOS_SELECTOR
-        fields[
-            vol.Optional("will_retain", default=will[ATTR_RETAIN])
-        ] = BOOLEAN_SELECTOR
+        fields[vol.Optional("will_retain", default=will[ATTR_RETAIN])] = (
+            BOOLEAN_SELECTOR
+        )
 
         return self.async_show_form(
             step_id="options",
@@ -450,7 +457,7 @@ class MQTTOptionsFlowHandler(config_entries.OptionsFlow):
 
 
 async def async_get_broker_settings(
-    hass: HomeAssistant,
+    flow: ConfigFlow | OptionsFlow,
     fields: OrderedDict[Any, Any],
     entry_config: MappingProxyType[str, Any] | None,
     user_input: dict[str, Any] | None,
@@ -463,6 +470,7 @@ async def async_get_broker_settings(
     or when the advanced_broker_options checkbox was selected.
     Returns True when settings are collected successfully.
     """
+    hass = flow.hass
     advanced_broker_options: bool = False
     user_input_basic: dict[str, Any] = {}
     current_config: dict[str, Any] = (
@@ -564,9 +572,7 @@ async def async_get_broker_settings(
             )
             schema = vol.Schema({cv.string: cv.template})
             schema(validated_user_input[CONF_WS_HEADERS])
-        except JSON_DECODE_EXCEPTIONS + (  # pylint: disable=wrong-exception-operation
-            vol.MultipleInvalid,
-        ):
+        except (*JSON_DECODE_EXCEPTIONS, vol.MultipleInvalid):
             errors["base"] = "bad_ws_headers"
             return False
         return True
@@ -588,7 +594,7 @@ async def async_get_broker_settings(
         current_user = user_input_basic.get(CONF_USERNAME)
         current_pass = user_input_basic.get(CONF_PASSWORD)
     else:
-        # Get default settings from entry or yaml (if any)
+        # Get default settings from entry (if any)
         current_broker = current_config.get(CONF_BROKER)
         current_port = current_config.get(CONF_PORT, DEFAULT_PORT)
         current_user = current_config.get(CONF_USERNAME)
@@ -641,9 +647,12 @@ async def async_get_broker_settings(
             description={"suggested_value": current_pass},
         )
     ] = PASSWORD_SELECTOR
-    # show advanced options checkbox if requested
+    # show advanced options checkbox if requested and
+    # advanced options are enabled
     # or when the defaults of advanced options are overridden
     if not advanced_broker_options:
+        if not flow.show_advanced_options:
+            return False
         fields[
             vol.Optional(
                 ADVANCED_OPTIONS,

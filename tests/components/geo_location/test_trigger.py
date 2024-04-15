@@ -1,4 +1,5 @@
 """The tests for the geolocation trigger."""
+
 import logging
 
 import pytest
@@ -14,7 +15,11 @@ from homeassistant.core import Context, HomeAssistant
 from homeassistant.setup import async_setup_component
 
 from tests.common import async_mock_service, mock_component
-from tests.components.blueprint.conftest import stub_blueprint_populate  # noqa: F401
+
+
+@pytest.fixture(autouse=True, name="stub_blueprint_populate")
+def stub_blueprint_populate_autouse(stub_blueprint_populate: None) -> None:
+    """Stub copying the blueprints to the config folder."""
 
 
 @pytest.fixture
@@ -67,16 +72,13 @@ async def test_if_fires_on_zone_enter(hass: HomeAssistant, calls) -> None:
                 "action": {
                     "service": "test.automation",
                     "data_template": {
-                        "some": "{{ trigger.%s }}"
-                        % "}} - {{ trigger.".join(
-                            (
-                                "platform",
-                                "entity_id",
-                                "from_state.state",
-                                "to_state.state",
-                                "zone.name",
-                                "id",
-                            )
+                        "some": (
+                            "{{ trigger.platform }}"
+                            " - {{ trigger.entity_id }}"
+                            " - {{ trigger.from_state.state }}"
+                            " - {{ trigger.to_state.state }}"
+                            " - {{ trigger.zone.name }}"
+                            " - {{ trigger.id }}"
                         )
                     },
                 },
@@ -280,15 +282,12 @@ async def test_if_fires_on_zone_appear(hass: HomeAssistant, calls) -> None:
                 "action": {
                     "service": "test.automation",
                     "data_template": {
-                        "some": "{{ trigger.%s }}"
-                        % "}} - {{ trigger.".join(
-                            (
-                                "platform",
-                                "entity_id",
-                                "from_state.state",
-                                "to_state.state",
-                                "zone.name",
-                            )
+                        "some": (
+                            "{{ trigger.platform }}"
+                            " - {{ trigger.entity_id }}"
+                            " - {{ trigger.from_state.state }}"
+                            " - {{ trigger.to_state.state }}"
+                            " - {{ trigger.zone.name }}"
                         )
                     },
                 },
@@ -329,15 +328,12 @@ async def test_if_fires_on_zone_appear_2(hass: HomeAssistant, calls) -> None:
                 "action": {
                     "service": "test.automation",
                     "data_template": {
-                        "some": "{{ trigger.%s }}"
-                        % "}} - {{ trigger.".join(
-                            (
-                                "platform",
-                                "entity_id",
-                                "from_state.state",
-                                "to_state.state",
-                                "zone.name",
-                            )
+                        "some": (
+                            "{{ trigger.platform }}"
+                            " - {{ trigger.entity_id }}"
+                            " - {{ trigger.from_state.state }}"
+                            " - {{ trigger.to_state.state }}"
+                            " - {{ trigger.zone.name }}"
                         )
                     },
                 },
@@ -394,15 +390,12 @@ async def test_if_fires_on_zone_disappear(hass: HomeAssistant, calls) -> None:
                 "action": {
                     "service": "test.automation",
                     "data_template": {
-                        "some": "{{ trigger.%s }}"
-                        % "}} - {{ trigger.".join(
-                            (
-                                "platform",
-                                "entity_id",
-                                "from_state.state",
-                                "to_state.state",
-                                "zone.name",
-                            )
+                        "some": (
+                            "{{ trigger.platform }}"
+                            " - {{ trigger.entity_id }}"
+                            " - {{ trigger.from_state.state }}"
+                            " - {{ trigger.to_state.state }}"
+                            " - {{ trigger.zone.name }}"
                         )
                     },
                 },

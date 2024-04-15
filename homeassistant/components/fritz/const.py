@@ -1,5 +1,6 @@
 """Constants for the FRITZ!Box Tools integration."""
 
+from enum import StrEnum
 from typing import Literal
 
 from fritzconnection.core.exceptions import (
@@ -13,7 +14,6 @@ from fritzconnection.core.exceptions import (
     FritzServiceError,
 )
 
-from homeassistant.backports.enum import StrEnum
 from homeassistant.const import Platform
 
 
@@ -28,9 +28,10 @@ class MeshRoles(StrEnum):
 DOMAIN = "fritz"
 
 PLATFORMS = [
-    Platform.BUTTON,
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.DEVICE_TRACKER,
+    Platform.IMAGE,
     Platform.SENSOR,
     Platform.SWITCH,
     Platform.UPDATE,
@@ -64,6 +65,8 @@ SWITCH_TYPE_PORTFORWARD = "PortForward"
 SWITCH_TYPE_PROFILE = "Profile"
 SWITCH_TYPE_WIFINETWORK = "WiFiNetwork"
 
+BUTTON_TYPE_WOL = "WakeOnLan"
+
 UPTIME_DEVIATION = 5
 
 FRITZ_EXCEPTIONS = (
@@ -78,3 +81,5 @@ FRITZ_EXCEPTIONS = (
 FRITZ_AUTH_EXCEPTIONS = (FritzAuthorizationError, FritzSecurityError)
 
 WIFI_STANDARD = {1: "2.4Ghz", 2: "5Ghz", 3: "5Ghz", 4: "Guest"}
+
+CONNECTION_TYPE_LAN = "LAN"

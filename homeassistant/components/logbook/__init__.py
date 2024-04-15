@@ -1,4 +1,5 @@
 """Event parser and human readable log generator."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -30,6 +31,7 @@ from homeassistant.helpers.integration_platform import (
 )
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import bind_hass
+from homeassistant.util.event_type import EventType
 
 from . import rest_api, websocket_api
 from .const import (  # noqa: F401
@@ -127,13 +129,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     possible_merged_entities_filter = convert_include_exclude_filter(merged_filter)
     if not possible_merged_entities_filter.empty_filter:
         filters = sqlalchemy_filter_from_include_exclude_conf(merged_filter)
-        entities_filter = possible_merged_entities_filter
+        entities_filter = possible_merged_entities_filter.get_filter()
     else:
         filters = None
         entities_filter = None
 
     external_events: dict[
-        str, tuple[str, Callable[[LazyEventPartialState], dict[str, Any]]]
+        EventType[Any] | str,
+        tuple[str, Callable[[LazyEventPartialState], dict[str, Any]]],
     ] = {}
     hass.data[DOMAIN] = LogbookConfig(external_events, filters, entities_filter)
     websocket_api.async_setup(hass)
@@ -145,9 +148,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def _process_logbook_platform(
-    hass: HomeAssistant, domain: str, platform: Any
-) -> None:
+@callback
+def _process_logbook_platform(hass: HomeAssistant, domain: str, platform: Any) -> None:
     """Process a logbook platform."""
     logbook_config: LogbookConfig = hass.data[DOMAIN]
     external_events = logbook_config.external_events

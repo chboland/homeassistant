@@ -1,4 +1,5 @@
 """Test button of ONVIF integration."""
+
 from unittest.mock import AsyncMock
 
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, ButtonDeviceClass
@@ -27,7 +28,7 @@ async def test_reboot_button(hass: HomeAssistant) -> None:
 async def test_reboot_button_press(hass: HomeAssistant) -> None:
     """Test Reboot button press."""
     _, camera, _ = await setup_onvif_integration(hass)
-    devicemgmt = camera.create_devicemgmt_service()
+    devicemgmt = await camera.create_devicemgmt_service()
     devicemgmt.SystemReboot = AsyncMock(return_value=True)
 
     await hass.services.async_call(

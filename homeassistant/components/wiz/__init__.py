@@ -1,4 +1,5 @@
 """WiZ Platform integration."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -12,6 +13,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_time_interval
@@ -41,6 +43,8 @@ PLATFORMS = [
 
 REQUEST_REFRESH_DELAY = 0.35
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 
 async def async_setup(hass: HomeAssistant, hass_config: ConfigType) -> bool:
     """Set up the wiz integration."""
@@ -51,7 +55,9 @@ async def async_setup(hass: HomeAssistant, hass_config: ConfigType) -> bool:
         )
 
     hass.async_create_background_task(_async_discovery(), "wiz-discovery")
-    async_track_time_interval(hass, _async_discovery, DISCOVERY_INTERVAL)
+    async_track_time_interval(
+        hass, _async_discovery, DISCOVERY_INTERVAL, cancel_on_shutdown=True
+    )
     return True
 
 
@@ -88,9 +94,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if bulb.power_monitoring is not False:
                 power: float | None = await bulb.get_power()
                 return power
-            return None
         except WIZ_EXCEPTIONS as ex:
             raise UpdateFailed(f"Failed to update device at {ip_address}: {ex}") from ex
+        return None
 
     coordinator = DataUpdateCoordinator(
         hass=hass,
@@ -107,9 +113,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     try:
         await coordinator.async_config_entry_first_refresh()
-    except ConfigEntryNotReady as err:
+    except ConfigEntryNotReady:
         await bulb.async_close()
-        raise err
+        raise
 
     async def _async_shutdown_on_stop(event: Event) -> None:
         await bulb.async_close()

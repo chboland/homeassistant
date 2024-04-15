@@ -1,4 +1,5 @@
 """Support for DSMR Reader through MQTT."""
+
 from __future__ import annotations
 
 from homeassistant.components import mqtt
@@ -23,6 +24,7 @@ async def async_setup_entry(
 class DSMRSensor(SensorEntity):
     """Representation of a DSMR sensor that is updated via MQTT."""
 
+    _attr_has_entity_name = True
     entity_description: DSMRReaderSensorEntityDescription
 
     def __init__(

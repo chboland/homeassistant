@@ -1,4 +1,5 @@
 """Support for Onkyo Receivers."""
+
 from __future__ import annotations
 
 import logging
@@ -14,6 +15,7 @@ from homeassistant.components.media_player import (
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
     MediaPlayerState,
+    MediaType,
 )
 from homeassistant.const import ATTR_ENTITY_ID, CONF_HOST, CONF_NAME
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -141,7 +143,7 @@ def determine_zones(receiver):
             _LOGGER.debug("Zone 2 not available")
     except ValueError as error:
         if str(error) != TIMEOUT_MESSAGE:
-            raise error
+            raise
         _LOGGER.debug("Zone 2 timed out, assuming no functionality")
     try:
         _LOGGER.debug("Checking for zone 3 capability")
@@ -152,7 +154,7 @@ def determine_zones(receiver):
             _LOGGER.debug("Zone 3 not available")
     except ValueError as error:
         if str(error) != TIMEOUT_MESSAGE:
-            raise error
+            raise
         _LOGGER.debug("Zone 3 timed out, assuming no functionality")
     except AssertionError:
         _LOGGER.error("Zone 3 detection failed")
@@ -394,7 +396,9 @@ class OnkyoDevice(MediaPlayerEntity):
             source = self._reverse_mapping[source]
         self.command(f"input-selector {source}")
 
-    def play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
+    def play_media(
+        self, media_type: MediaType | str, media_id: str, **kwargs: Any
+    ) -> None:
         """Play radio station by preset number."""
         source = self._reverse_mapping[self._attr_source]
         if media_type.lower() == "radio" and source in DEFAULT_PLAYABLE_SOURCES:

@@ -1,4 +1,5 @@
 """Test cases for the switcher_kis component."""
+
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -14,7 +15,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
-from homeassistant.util import dt, slugify
+from homeassistant.util import dt as dt_util, slugify
 
 from . import init_integration
 from .consts import DUMMY_SWITCHER_DEVICES, YAML_CONFIG
@@ -40,6 +41,8 @@ async def test_async_setup_user_config_flow(hass: HomeAssistant, mock_bridge) ->
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
+        await hass.async_block_till_done()
+
     await hass.config_entries.flow.async_configure(result["flow_id"], {})
     await hass.async_block_till_done()
 
@@ -63,7 +66,7 @@ async def test_update_fail(
     assert len(hass.data[DOMAIN][DATA_DEVICE]) == 2
 
     async_fire_time_changed(
-        hass, dt.utcnow() + timedelta(seconds=MAX_UPDATE_INTERVAL_SEC + 1)
+        hass, dt_util.utcnow() + timedelta(seconds=MAX_UPDATE_INTERVAL_SEC + 1)
     )
     await hass.async_block_till_done()
 
@@ -77,22 +80,23 @@ async def test_update_fail(
         state = hass.states.get(entity_id)
         assert state.state == STATE_UNAVAILABLE
 
-        entity_id = f"sensor.{slugify(device.name)}_power_consumption"
+        entity_id = f"sensor.{slugify(device.name)}_power"
         state = hass.states.get(entity_id)
         assert state.state == STATE_UNAVAILABLE
 
     mock_bridge.mock_callbacks(DUMMY_SWITCHER_DEVICES)
     await hass.async_block_till_done()
     async_fire_time_changed(
-        hass, dt.utcnow() + timedelta(seconds=MAX_UPDATE_INTERVAL_SEC - 1)
+        hass, dt_util.utcnow() + timedelta(seconds=MAX_UPDATE_INTERVAL_SEC - 2)
     )
+    await hass.async_block_till_done()
 
     for device in DUMMY_SWITCHER_DEVICES:
         entity_id = f"switch.{slugify(device.name)}"
         state = hass.states.get(entity_id)
         assert state.state != STATE_UNAVAILABLE
 
-        entity_id = f"sensor.{slugify(device.name)}_power_consumption"
+        entity_id = f"sensor.{slugify(device.name)}_power"
         state = hass.states.get(entity_id)
         assert state.state != STATE_UNAVAILABLE
 

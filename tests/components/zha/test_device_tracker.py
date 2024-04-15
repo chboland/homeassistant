@@ -1,11 +1,12 @@
 """Test ZHA Device Tracker."""
+
 from datetime import timedelta
 import time
 from unittest.mock import patch
 
 import pytest
 import zigpy.profiles.zha
-import zigpy.zcl.clusters.general as general
+from zigpy.zcl.clusters import general
 
 from homeassistant.components.device_tracker import SourceType
 from homeassistant.components.zha.core.registries import (
@@ -70,7 +71,7 @@ async def test_device_tracker(
 
     zha_device = await zha_device_joined_restored(zigpy_device_dt)
     cluster = zigpy_device_dt.endpoints.get(1).power
-    entity_id = await find_entity_id(Platform.DEVICE_TRACKER, zha_device, hass)
+    entity_id = find_entity_id(Platform.DEVICE_TRACKER, zha_device, hass)
     assert entity_id is not None
 
     assert hass.states.get(entity_id).state == STATE_NOT_HOME

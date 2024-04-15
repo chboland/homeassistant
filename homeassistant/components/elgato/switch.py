@@ -1,4 +1,5 @@
 """Support for Elgato switches."""
+
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
@@ -19,28 +20,19 @@ from .coordinator import ElgatoData, ElgatoDataUpdateCoordinator
 from .entity import ElgatoEntity
 
 
-@dataclass
-class ElgatoEntityDescriptionMixin:
-    """Mixin values for Elgato entities."""
-
-    is_on_fn: Callable[[ElgatoData], bool | None]
-    set_fn: Callable[[Elgato, bool], Awaitable[Any]]
-
-
-@dataclass
-class ElgatoSwitchEntityDescription(
-    SwitchEntityDescription, ElgatoEntityDescriptionMixin
-):
+@dataclass(frozen=True, kw_only=True)
+class ElgatoSwitchEntityDescription(SwitchEntityDescription):
     """Class describing Elgato switch entities."""
 
     has_fn: Callable[[ElgatoData], bool] = lambda _: True
+    is_on_fn: Callable[[ElgatoData], bool | None]
+    set_fn: Callable[[Elgato, bool], Awaitable[Any]]
 
 
 SWITCHES = [
     ElgatoSwitchEntityDescription(
         key="bypass",
-        name="Studio mode",
-        icon="mdi:battery-off-outline",
+        translation_key="bypass",
         entity_category=EntityCategory.CONFIG,
         has_fn=lambda x: x.battery is not None,
         is_on_fn=lambda x: x.settings.battery.bypass if x.settings.battery else None,
@@ -48,8 +40,7 @@ SWITCHES = [
     ),
     ElgatoSwitchEntityDescription(
         key="energy_saving",
-        name="Energy saving",
-        icon="mdi:leaf",
+        translation_key="energy_saving",
         entity_category=EntityCategory.CONFIG,
         has_fn=lambda x: x.battery is not None,
         is_on_fn=lambda x: (

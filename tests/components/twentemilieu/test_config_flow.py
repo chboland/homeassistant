@@ -1,4 +1,5 @@
 """Tests for the Twente Milieu config flow."""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -29,8 +30,8 @@ async def test_full_user_flow(hass: HomeAssistant, snapshot: SnapshotAssertion) 
         DOMAIN, context={"source": SOURCE_USER}
     )
 
-    assert result.get("type") == FlowResultType.FORM
-    assert result.get("step_id") == SOURCE_USER
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "user"
 
     result2 = await hass.config_entries.flow.async_configure(
         result["flow_id"],
@@ -41,7 +42,7 @@ async def test_full_user_flow(hass: HomeAssistant, snapshot: SnapshotAssertion) 
         },
     )
 
-    assert result2.get("type") == FlowResultType.CREATE_ENTRY
+    assert result2.get("type") is FlowResultType.CREATE_ENTRY
     assert result2 == snapshot
 
 
@@ -59,8 +60,8 @@ async def test_invalid_address(
         DOMAIN, context={"source": SOURCE_USER}
     )
 
-    assert result.get("type") == FlowResultType.FORM
-    assert result.get("step_id") == SOURCE_USER
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "user"
 
     mock_twentemilieu.unique_id.side_effect = TwenteMilieuAddressError
     result2 = await hass.config_entries.flow.async_configure(
@@ -71,8 +72,8 @@ async def test_invalid_address(
         },
     )
 
-    assert result2.get("type") == FlowResultType.FORM
-    assert result2.get("step_id") == SOURCE_USER
+    assert result2.get("type") is FlowResultType.FORM
+    assert result2.get("step_id") == "user"
     assert result2.get("errors") == {"base": "invalid_address"}
 
     mock_twentemilieu.unique_id.side_effect = None
@@ -84,7 +85,7 @@ async def test_invalid_address(
         },
     )
 
-    assert result3.get("type") == FlowResultType.CREATE_ENTRY
+    assert result3.get("type") is FlowResultType.CREATE_ENTRY
     assert result3 == snapshot
 
 
@@ -105,8 +106,8 @@ async def test_connection_error(
         },
     )
 
-    assert result.get("type") == FlowResultType.FORM
-    assert result.get("step_id") == SOURCE_USER
+    assert result.get("type") is FlowResultType.FORM
+    assert result.get("step_id") == "user"
     assert result.get("errors") == {"base": "cannot_connect"}
 
 
@@ -127,5 +128,5 @@ async def test_address_already_set_up(
         },
     )
 
-    assert result.get("type") == FlowResultType.ABORT
+    assert result.get("type") is FlowResultType.ABORT
     assert result.get("reason") == "already_configured"

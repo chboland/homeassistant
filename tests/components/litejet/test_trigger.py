@@ -1,4 +1,5 @@
 """The tests for the litejet component."""
+
 from datetime import timedelta
 import logging
 from unittest import mock
@@ -7,14 +8,19 @@ from unittest.mock import patch
 import pytest
 
 from homeassistant import setup
-import homeassistant.components.automation as automation
+from homeassistant.components import automation
 from homeassistant.core import HomeAssistant
 import homeassistant.util.dt as dt_util
 
 from . import async_init_integration
 
 from tests.common import async_fire_time_changed_exact, async_mock_service
-from tests.components.blueprint.conftest import stub_blueprint_populate  # noqa: F401
+
+
+@pytest.fixture(autouse=True, name="stub_blueprint_populate")
+def stub_blueprint_populate_autouse(stub_blueprint_populate: None) -> None:
+    """Stub copying the blueprints to the config folder."""
+
 
 _LOGGER = logging.getLogger(__name__)
 

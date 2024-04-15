@@ -1,4 +1,5 @@
 """Sensor for Steam account status."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,7 +13,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.util.dt import utc_from_timestamp
 
-from . import SteamEntity
 from .const import (
     CONF_ACCOUNTS,
     DOMAIN,
@@ -23,6 +23,7 @@ from .const import (
     STEAM_STATUSES,
 )
 from .coordinator import SteamDataUpdateCoordinator
+from .entity import SteamEntity
 
 PARALLEL_UPDATES = 1
 

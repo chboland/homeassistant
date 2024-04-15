@@ -1,4 +1,5 @@
 """Test the Litter-Robot sensor entity."""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -85,7 +86,7 @@ async def test_litter_robot_sensor(
     assert sensor.state == "2022-09-17T12:06:37+00:00"
     assert sensor.attributes["device_class"] == SensorDeviceClass.TIMESTAMP
     sensor = hass.states.get("sensor.test_status_code")
-    assert sensor.state == "dfs"
+    assert sensor.state == "rdy"
     assert sensor.attributes["device_class"] == SensorDeviceClass.ENUM
     sensor = hass.states.get("sensor.test_litter_level")
     assert sensor.state == "70.0"
@@ -101,5 +102,5 @@ async def test_feeder_robot_sensor(
     """Tests Feeder-Robot sensors."""
     await setup_integration(hass, mock_account_with_feederrobot, PLATFORM_DOMAIN)
     sensor = hass.states.get("sensor.test_food_level")
-    assert sensor.state == "20"
+    assert sensor.state == "10"
     assert sensor.attributes["unit_of_measurement"] == PERCENTAGE

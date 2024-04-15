@@ -1,4 +1,5 @@
 """The gateway tests for the august platform."""
+
 from unittest.mock import MagicMock, patch
 
 from yalexs.authenticator_common import AuthenticationState
@@ -35,7 +36,7 @@ async def _patched_refresh_access_token(
             "original_token", 1234, AuthenticationState.AUTHENTICATED
         )
     )
-    august_gateway = AugustGateway(hass)
+    august_gateway = AugustGateway(hass, MagicMock())
     mocked_config = _mock_get_config()
     await august_gateway.async_setup(mocked_config[DOMAIN])
     await august_gateway.async_authenticate()

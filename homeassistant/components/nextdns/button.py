@@ -1,4 +1,5 @@
 """Support for the NextDNS service."""
+
 from __future__ import annotations
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
@@ -15,7 +16,7 @@ PARALLEL_UPDATES = 1
 
 CLEAR_LOGS_BUTTON = ButtonEntityDescription(
     key="clear_logs",
-    name="Clear logs",
+    translation_key="clear_logs",
     entity_category=EntityCategory.CONFIG,
 )
 

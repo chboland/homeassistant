@@ -1,15 +1,20 @@
 """The tests for the MQTT automation."""
-from unittest.mock import ANY, patch
+
+from unittest.mock import ANY
 
 import pytest
 
-import homeassistant.components.automation as automation
+from homeassistant.components import automation
 from homeassistant.const import ATTR_ENTITY_ID, ENTITY_MATCH_ALL, SERVICE_TURN_OFF
 from homeassistant.core import HomeAssistant
 from homeassistant.setup import async_setup_component
 
 from tests.common import async_fire_mqtt_message, async_mock_service, mock_component
-from tests.components.blueprint.conftest import stub_blueprint_populate  # noqa: F401
+
+
+@pytest.fixture(autouse=True, name="stub_blueprint_populate")
+def stub_blueprint_populate_autouse(stub_blueprint_populate: None) -> None:
+    """Stub copying the blueprints to the config folder."""
 
 
 @pytest.fixture
@@ -19,17 +24,10 @@ def calls(hass: HomeAssistant):
 
 
 @pytest.fixture(autouse=True)
-def no_platforms():
-    """Skip platform setup to speed up tests."""
-    with patch("homeassistant.components.mqtt.PLATFORMS", []):
-        yield
-
-
-@pytest.fixture(autouse=True)
-async def setup_comp(hass: HomeAssistant, mqtt_mock_entry_no_yaml_config):
+async def setup_comp(hass: HomeAssistant, mqtt_mock_entry):
     """Initialize components."""
     mock_component(hass, "group")
-    return await mqtt_mock_entry_no_yaml_config()
+    return await mqtt_mock_entry()
 
 
 async def test_if_fires_on_topic_match(hass: HomeAssistant, calls) -> None:

@@ -1,11 +1,11 @@
 """The tests for the sun automation."""
+
 from datetime import datetime
 
 from freezegun import freeze_time
 import pytest
 
-from homeassistant.components import sun
-import homeassistant.components.automation as automation
+from homeassistant.components import automation, sun
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     ENTITY_MATCH_ALL,
@@ -19,7 +19,11 @@ from homeassistant.setup import async_setup_component
 import homeassistant.util.dt as dt_util
 
 from tests.common import async_fire_time_changed, async_mock_service, mock_component
-from tests.components.blueprint.conftest import stub_blueprint_populate  # noqa: F401
+
+
+@pytest.fixture(autouse=True, name="stub_blueprint_populate")
+def stub_blueprint_populate_autouse(stub_blueprint_populate: None) -> None:
+    """Stub copying the blueprints to the config folder."""
 
 
 @pytest.fixture
@@ -123,8 +127,11 @@ async def test_sunset_trigger_with_offset(hass: HomeAssistant, calls) -> None:
                     "action": {
                         "service": "test.automation",
                         "data_template": {
-                            "some": "{{ trigger.%s }}"
-                            % "}} - {{ trigger.".join(("platform", "event", "offset"))
+                            "some": (
+                                "{{ trigger.platform }}"
+                                " - {{ trigger.event }}"
+                                " - {{ trigger.offset }}"
+                            )
                         },
                     },
                 }

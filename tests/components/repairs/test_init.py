@@ -1,9 +1,8 @@
 """Test the repairs websocket API."""
-from collections.abc import Awaitable, Callable
+
 from unittest.mock import AsyncMock, Mock
 
-from aiohttp import ClientWebSocketResponse
-from freezegun import freeze_time
+from freezegun.api import FrozenDateTimeFactory
 import pytest
 
 from homeassistant.components.repairs import repairs_flow_manager
@@ -28,7 +27,7 @@ from tests.common import mock_platform
 from tests.typing import WebSocketGenerator
 
 
-@freeze_time("2022-07-19 07:53:05")
+@pytest.mark.freeze_time("2022-07-19 07:53:05")
 async def test_create_update_issue(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator
 ) -> None:
@@ -126,7 +125,7 @@ async def test_create_update_issue(
     )
 
 
-@pytest.mark.parametrize("ha_version", ("2022.9.cat", "In the future: 2023.1.1"))
+@pytest.mark.parametrize("ha_version", ["2022.9.cat", "In the future: 2023.1.1"])
 async def test_create_issue_invalid_version(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator, ha_version
 ) -> None:
@@ -167,7 +166,7 @@ async def test_create_issue_invalid_version(
     assert msg["result"] == {"issues": []}
 
 
-@freeze_time("2022-07-19 07:53:05")
+@pytest.mark.freeze_time("2022-07-19 07:53:05")
 async def test_ignore_issue(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator
 ) -> None:
@@ -336,8 +335,11 @@ async def test_ignore_issue(
     }
 
 
+@pytest.mark.freeze_time("2022-07-19 07:53:05")
 async def test_delete_issue(
-    hass: HomeAssistant, hass_ws_client: WebSocketGenerator, freezer
+    hass: HomeAssistant,
+    hass_ws_client: WebSocketGenerator,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     """Test we can delete an issue."""
     freezer.move_to("2022-07-19 07:53:05")
@@ -462,6 +464,7 @@ async def test_delete_issue(
     }
 
 
+@pytest.mark.no_fail_on_log_exception
 async def test_non_compliant_platform(
     hass: HomeAssistant, hass_ws_client: WebSocketGenerator
 ) -> None:
@@ -486,10 +489,10 @@ async def test_non_compliant_platform(
     assert list(hass.data[DOMAIN]["platforms"].keys()) == ["fake_integration"]
 
 
-@freeze_time("2022-07-21 08:22:00")
+@pytest.mark.freeze_time("2022-07-21 08:22:00")
 async def test_sync_methods(
     hass: HomeAssistant,
-    hass_ws_client: Callable[[HomeAssistant], Awaitable[ClientWebSocketResponse]],
+    hass_ws_client: WebSocketGenerator,
 ) -> None:
     """Test sync method for creating and deleting an issue."""
 

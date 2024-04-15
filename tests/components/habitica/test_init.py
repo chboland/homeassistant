@@ -1,4 +1,5 @@
 """Test the habitica module."""
+
 from http import HTTPStatus
 
 import pytest
@@ -123,7 +124,7 @@ async def test_service_call(
         ATTR_PATH: ["tasks", "user", "post"],
         ATTR_ARGS: TEST_API_CALL_ARGS,
     }
-    assert await hass.services.async_call(
+    await hass.services.async_call(
         DOMAIN, SERVICE_API_CALL, TEST_SERVICE_DATA, blocking=True
     )
 

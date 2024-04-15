@@ -1,4 +1,5 @@
 """The tests for the Tasmota binary sensor platform."""
+
 import copy
 import json
 from unittest.mock import call
@@ -44,7 +45,7 @@ async def test_device_remove(
 
     # Verify device entry is created
     device_entry = device_reg.async_get_device(
-        set(), {(dr.CONNECTION_NETWORK_MAC, mac)}
+        connections={(dr.CONNECTION_NETWORK_MAC, mac)}
     )
     assert device_entry is not None
 
@@ -53,7 +54,7 @@ async def test_device_remove(
 
     # Verify device entry is removed
     device_entry = device_reg.async_get_device(
-        set(), {(dr.CONNECTION_NETWORK_MAC, mac)}
+        connections={(dr.CONNECTION_NETWORK_MAC, mac)}
     )
     assert device_entry is None
 
@@ -104,7 +105,7 @@ async def test_device_remove_non_tasmota_device(
 
     # Verify device entry is removed
     device_entry = device_reg.async_get_device(
-        set(), {(dr.CONNECTION_NETWORK_MAC, mac)}
+        connections={(dr.CONNECTION_NETWORK_MAC, mac)}
     )
     assert device_entry is None
 
@@ -135,7 +136,7 @@ async def test_device_remove_stale_tasmota_device(
 
     # Verify device entry is removed
     device_entry = device_reg.async_get_device(
-        set(), {(dr.CONNECTION_NETWORK_MAC, mac)}
+        connections={(dr.CONNECTION_NETWORK_MAC, mac)}
     )
     assert device_entry is None
 
@@ -161,7 +162,7 @@ async def test_tasmota_ws_remove_discovered_device(
 
     # Verify device entry is created
     device_entry = device_reg.async_get_device(
-        set(), {(dr.CONNECTION_NETWORK_MAC, mac)}
+        connections={(dr.CONNECTION_NETWORK_MAC, mac)}
     )
     assert device_entry is not None
 
@@ -180,6 +181,6 @@ async def test_tasmota_ws_remove_discovered_device(
 
     # Verify device entry is cleared
     device_entry = device_reg.async_get_device(
-        set(), {(dr.CONNECTION_NETWORK_MAC, mac)}
+        connections={(dr.CONNECTION_NETWORK_MAC, mac)}
     )
     assert device_entry is None

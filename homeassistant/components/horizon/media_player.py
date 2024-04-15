@@ -1,4 +1,5 @@
 """Support for the Unitymedia Horizon HD Recorder."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -142,7 +143,9 @@ class HorizonDevice(MediaPlayerEntity):
         else:
             self._attr_state = MediaPlayerState.PAUSED
 
-    def play_media(self, media_type: str, media_id: str, **kwargs: Any) -> None:
+    def play_media(
+        self, media_type: MediaType | str, media_id: str, **kwargs: Any
+    ) -> None:
         """Play media / switch to channel."""
         if media_type == MediaType.CHANNEL:
             try:

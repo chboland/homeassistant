@@ -1,4 +1,5 @@
 """Test the unit system helper."""
+
 from __future__ import annotations
 
 import pytest
@@ -336,7 +337,7 @@ def test_get_unit_system_invalid(key: str) -> None:
 
 @pytest.mark.parametrize(
     ("device_class", "original_unit", "state_unit"),
-    (
+    [
         # Test atmospheric pressure
         (
             SensorDeviceClass.ATMOSPHERIC_PRESSURE,
@@ -457,7 +458,26 @@ def test_get_unit_system_invalid(key: str) -> None:
         (SensorDeviceClass.WATER, UnitOfVolume.CUBIC_METERS, None),
         (SensorDeviceClass.WATER, UnitOfVolume.LITERS, None),
         (SensorDeviceClass.WATER, "very_much", None),
-    ),
+        # Test wind speed conversion
+        (
+            SensorDeviceClass.WIND_SPEED,
+            UnitOfSpeed.FEET_PER_SECOND,
+            UnitOfSpeed.KILOMETERS_PER_HOUR,
+        ),
+        (
+            SensorDeviceClass.WIND_SPEED,
+            UnitOfSpeed.MILES_PER_HOUR,
+            UnitOfSpeed.KILOMETERS_PER_HOUR,
+        ),
+        (SensorDeviceClass.WIND_SPEED, UnitOfSpeed.KILOMETERS_PER_HOUR, None),
+        (SensorDeviceClass.WIND_SPEED, UnitOfSpeed.KNOTS, None),
+        (
+            SensorDeviceClass.WIND_SPEED,
+            UnitOfSpeed.METERS_PER_SECOND,
+            UnitOfSpeed.KILOMETERS_PER_HOUR,
+        ),
+        (SensorDeviceClass.WIND_SPEED, "very_fast", None),
+    ],
 )
 def test_get_metric_converted_unit_(
     device_class: SensorDeviceClass,
@@ -496,6 +516,7 @@ UNCONVERTED_UNITS_METRIC_SYSTEM = {
         UnitOfPressure.PA,
     ),
     SensorDeviceClass.SPEED: (
+        UnitOfSpeed.BEAUFORT,
         UnitOfSpeed.KILOMETERS_PER_HOUR,
         UnitOfSpeed.KNOTS,
         UnitOfSpeed.METERS_PER_SECOND,
@@ -516,7 +537,7 @@ UNCONVERTED_UNITS_METRIC_SYSTEM = {
 
 @pytest.mark.parametrize(
     "device_class",
-    (
+    [
         SensorDeviceClass.ATMOSPHERIC_PRESSURE,
         SensorDeviceClass.DISTANCE,
         SensorDeviceClass.GAS,
@@ -526,7 +547,7 @@ UNCONVERTED_UNITS_METRIC_SYSTEM = {
         SensorDeviceClass.SPEED,
         SensorDeviceClass.VOLUME,
         SensorDeviceClass.WATER,
-    ),
+    ],
 )
 def test_metric_converted_units(device_class: SensorDeviceClass) -> None:
     """Test unit conversion rules are in place for all units."""
@@ -544,7 +565,7 @@ def test_metric_converted_units(device_class: SensorDeviceClass) -> None:
 
 @pytest.mark.parametrize(
     ("device_class", "original_unit", "state_unit"),
-    (
+    [
         # Test atmospheric pressure
         (
             SensorDeviceClass.ATMOSPHERIC_PRESSURE,
@@ -657,7 +678,26 @@ def test_metric_converted_units(device_class: SensorDeviceClass) -> None:
         (SensorDeviceClass.WATER, UnitOfVolume.CUBIC_FEET, None),
         (SensorDeviceClass.WATER, UnitOfVolume.GALLONS, None),
         (SensorDeviceClass.WATER, "very_much", None),
-    ),
+        # Test wind speed conversion
+        (
+            SensorDeviceClass.WIND_SPEED,
+            UnitOfSpeed.METERS_PER_SECOND,
+            UnitOfSpeed.MILES_PER_HOUR,
+        ),
+        (
+            SensorDeviceClass.WIND_SPEED,
+            UnitOfSpeed.KILOMETERS_PER_HOUR,
+            UnitOfSpeed.MILES_PER_HOUR,
+        ),
+        (
+            SensorDeviceClass.WIND_SPEED,
+            UnitOfSpeed.FEET_PER_SECOND,
+            UnitOfSpeed.MILES_PER_HOUR,
+        ),
+        (SensorDeviceClass.WIND_SPEED, UnitOfSpeed.KNOTS, None),
+        (SensorDeviceClass.WIND_SPEED, UnitOfSpeed.MILES_PER_HOUR, None),
+        (SensorDeviceClass.WIND_SPEED, "very_fast", None),
+    ],
 )
 def test_get_us_converted_unit(
     device_class: SensorDeviceClass,
@@ -685,6 +725,7 @@ UNCONVERTED_UNITS_US_SYSTEM = {
     ),
     SensorDeviceClass.PRESSURE: (UnitOfPressure.INHG, UnitOfPressure.PSI),
     SensorDeviceClass.SPEED: (
+        UnitOfSpeed.BEAUFORT,
         UnitOfSpeed.FEET_PER_SECOND,
         UnitOfSpeed.KNOTS,
         UnitOfSpeed.MILES_PER_HOUR,
@@ -707,7 +748,7 @@ UNCONVERTED_UNITS_US_SYSTEM = {
 
 @pytest.mark.parametrize(
     "device_class",
-    (
+    [
         SensorDeviceClass.ATMOSPHERIC_PRESSURE,
         SensorDeviceClass.DISTANCE,
         SensorDeviceClass.GAS,
@@ -717,7 +758,7 @@ UNCONVERTED_UNITS_US_SYSTEM = {
         SensorDeviceClass.SPEED,
         SensorDeviceClass.VOLUME,
         SensorDeviceClass.WATER,
-    ),
+    ],
 )
 def test_imperial_converted_units(device_class: SensorDeviceClass) -> None:
     """Test unit conversion rules are in place for all units."""

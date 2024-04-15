@@ -1,4 +1,5 @@
 """Tests for the Risco event sensors."""
+
 from datetime import timedelta
 from unittest.mock import MagicMock, PropertyMock, patch
 
@@ -11,7 +12,7 @@ from homeassistant.components.risco import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util import dt
+from homeassistant.util import dt as dt_util
 
 from tests.common import async_fire_time_changed
 
@@ -110,12 +111,15 @@ CATEGORIES_TO_EVENTS = {
 
 @pytest.fixture
 def _no_zones_and_partitions():
-    with patch(
-        "homeassistant.components.risco.RiscoLocal.zones",
-        new_callable=PropertyMock(return_value=[]),
-    ), patch(
-        "homeassistant.components.risco.RiscoLocal.partitions",
-        new_callable=PropertyMock(return_value=[]),
+    with (
+        patch(
+            "homeassistant.components.risco.RiscoLocal.zones",
+            new_callable=PropertyMock(return_value=[]),
+        ),
+        patch(
+            "homeassistant.components.risco.RiscoLocal.partitions",
+            new_callable=PropertyMock(return_value=[]),
+        ),
     ):
         yield
 
@@ -137,7 +141,7 @@ def _check_state(hass, category, entity_id):
     event_index = CATEGORIES_TO_EVENTS[category]
     event = TEST_EVENTS[event_index]
     state = hass.states.get(entity_id)
-    assert state.state == dt.parse_datetime(event.time).isoformat()
+    assert state.state == dt_util.parse_datetime(event.time).isoformat()
     assert state.attributes["category_id"] == event.category_id
     assert state.attributes["category_name"] == event.category_name
     assert state.attributes["type_id"] == event.type_id
@@ -162,7 +166,8 @@ def _set_utc_time_zone(hass):
 
 
 @pytest.fixture
-def _save_mock():
+def save_mock():
+    """Create a mock for async_save."""
     with patch(
         "homeassistant.components.risco.Store.async_save",
     ) as save_mock:
@@ -174,7 +179,7 @@ async def test_cloud_setup(
     hass: HomeAssistant,
     two_zone_cloud,
     _set_utc_time_zone,
-    _save_mock,
+    save_mock,
     setup_risco_cloud,
 ) -> None:
     """Test entity setup."""
@@ -182,17 +187,20 @@ async def test_cloud_setup(
     for id in ENTITY_IDS.values():
         assert registry.async_is_registered(id)
 
-    _save_mock.assert_awaited_once_with({LAST_EVENT_TIMESTAMP_KEY: TEST_EVENTS[0].time})
+    save_mock.assert_awaited_once_with({LAST_EVENT_TIMESTAMP_KEY: TEST_EVENTS[0].time})
     for category, entity_id in ENTITY_IDS.items():
         _check_state(hass, category, entity_id)
 
-    with patch(
-        "homeassistant.components.risco.RiscoCloud.get_events", return_value=[]
-    ) as events_mock, patch(
-        "homeassistant.components.risco.Store.async_load",
-        return_value={LAST_EVENT_TIMESTAMP_KEY: TEST_EVENTS[0].time},
+    with (
+        patch(
+            "homeassistant.components.risco.RiscoCloud.get_events", return_value=[]
+        ) as events_mock,
+        patch(
+            "homeassistant.components.risco.Store.async_load",
+            return_value={LAST_EVENT_TIMESTAMP_KEY: TEST_EVENTS[0].time},
+        ),
     ):
-        async_fire_time_changed(hass, dt.utcnow() + timedelta(seconds=65))
+        async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=65))
         await hass.async_block_till_done()
         events_mock.assert_awaited_once_with(TEST_EVENTS[0].time, 10)
 

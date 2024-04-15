@@ -1,4 +1,5 @@
 """Support for Azure Event Hubs."""
+
 from __future__ import annotations
 
 import asyncio
@@ -155,7 +156,6 @@ class AzureEventHub:
         Suppress the INFO and below logging on the underlying packages,
         they are very verbose, even at INFO.
         """
-        logging.getLogger("uamqp").setLevel(logging.WARNING)
         logging.getLogger("azure.eventhub").setLevel(logging.WARNING)
         self._listener_remover = self.hass.bus.async_listen(
             MATCH_ALL, self.async_listen

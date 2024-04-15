@@ -1,4 +1,5 @@
 """The thread websocket API."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -20,6 +21,8 @@ def async_setup(hass: HomeAssistant) -> None:
     websocket_api.async_register_command(hass, ws_discover_routers)
     websocket_api.async_register_command(hass, ws_get_dataset)
     websocket_api.async_register_command(hass, ws_list_datasets)
+    websocket_api.async_register_command(hass, ws_set_preferred_border_agent)
+    websocket_api.async_register_command(hass, ws_set_preferred_dataset)
 
 
 @websocket_api.require_admin
@@ -43,6 +46,56 @@ async def ws_add_dataset(
     except TLVError as exc:
         connection.send_error(
             msg["id"], websocket_api.const.ERR_INVALID_FORMAT, str(exc)
+        )
+        return
+
+    connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "thread/set_preferred_border_agent",
+        vol.Required("dataset_id"): str,
+        vol.Required("border_agent_id"): vol.Any(str, None),
+        vol.Required("extended_address"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_set_preferred_border_agent(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Set the preferred border agent's border agent ID and extended address."""
+    dataset_id = msg["dataset_id"]
+    border_agent_id = msg["border_agent_id"]
+    extended_address = msg["extended_address"]
+    store = await dataset_store.async_get_store(hass)
+    store.async_set_preferred_border_agent(
+        dataset_id, border_agent_id, extended_address
+    )
+    connection.send_result(msg["id"])
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): "thread/set_preferred_dataset",
+        vol.Required("dataset_id"): str,
+    }
+)
+@websocket_api.async_response
+async def ws_set_preferred_dataset(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Add a thread dataset."""
+    dataset_id = msg["dataset_id"]
+
+    store = await dataset_store.async_get_store(hass)
+    try:
+        store.preferred_dataset = dataset_id
+    except KeyError:
+        connection.send_error(
+            msg["id"], websocket_api.const.ERR_NOT_FOUND, "unknown dataset"
         )
         return
 
@@ -113,20 +166,22 @@ async def ws_list_datasets(
     """Get a list of thread datasets."""
 
     store = await dataset_store.async_get_store(hass)
-    result = []
     preferred_dataset = store.preferred_dataset
-    for dataset in store.datasets.values():
-        result.append(
-            {
-                "created": dataset.created,
-                "dataset_id": dataset.id,
-                "extended_pan_id": dataset.extended_pan_id,
-                "network_name": dataset.network_name,
-                "pan_id": dataset.pan_id,
-                "preferred": dataset.id == preferred_dataset,
-                "source": dataset.source,
-            }
-        )
+    result = [
+        {
+            "channel": dataset.channel,
+            "created": dataset.created,
+            "dataset_id": dataset.id,
+            "extended_pan_id": dataset.extended_pan_id,
+            "network_name": dataset.network_name,
+            "pan_id": dataset.pan_id,
+            "preferred": dataset.id == preferred_dataset,
+            "preferred_border_agent_id": dataset.preferred_border_agent_id,
+            "preferred_extended_address": dataset.preferred_extended_address,
+            "source": dataset.source,
+        }
+        for dataset in store.datasets.values()
+    ]
 
     connection.send_result(msg["id"], {"datasets": result})
 

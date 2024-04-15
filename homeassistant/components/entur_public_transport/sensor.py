@@ -1,4 +1,5 @@
 """Real-time information about public transport departures in Norway."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -183,7 +184,7 @@ class EnturPublicTransportSensor(SensorEntity):
         return self._state
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, str]:
         """Return the state attributes."""
         self._attributes[ATTR_STOP_ID] = self._stop
         return self._attributes
@@ -237,9 +238,9 @@ class EnturPublicTransportSensor(SensorEntity):
         self._attributes[ATTR_NEXT_UP_AT] = calls[1].expected_departure_time.strftime(
             "%H:%M"
         )
-        self._attributes[
-            ATTR_NEXT_UP_IN
-        ] = f"{due_in_minutes(calls[1].expected_departure_time)} min"
+        self._attributes[ATTR_NEXT_UP_IN] = (
+            f"{due_in_minutes(calls[1].expected_departure_time)} min"
+        )
         self._attributes[ATTR_NEXT_UP_REALTIME] = calls[1].is_realtime
         self._attributes[ATTR_NEXT_UP_DELAY] = calls[1].delay_in_min
 

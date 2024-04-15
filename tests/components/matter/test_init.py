@@ -1,11 +1,11 @@
 """Test the Matter integration init."""
+
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Generator
+from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
-from aiohttp import ClientWebSocketResponse
 from matter_server.client.exceptions import CannotConnect, InvalidServerVersion
 from matter_server.client.models.node import MatterNode
 from matter_server.common.errors import MatterError
@@ -28,6 +28,7 @@ from homeassistant.setup import async_setup_component
 from .common import load_and_parse_node_fixture, setup_integration_with_node_fixture
 
 from tests.common import MockConfigEntry
+from tests.typing import WebSocketGenerator
 
 
 @pytest.fixture(name="connect_timeout")
@@ -67,7 +68,7 @@ async def test_entry_setup_unload(
     await hass.async_block_till_done()
 
     assert matter_client.connect.call_count == 1
-    assert entry.state == ConfigEntryState.LOADED
+    assert entry.state is ConfigEntryState.LOADED
     entity_state = hass.states.get("light.mock_onoff_light")
     assert entity_state
     assert entity_state.state != STATE_UNAVAILABLE
@@ -75,7 +76,7 @@ async def test_entry_setup_unload(
     await hass.config_entries.async_unload(entry.entry_id)
 
     assert matter_client.disconnect.call_count == 1
-    assert entry.state == ConfigEntryState.NOT_LOADED
+    assert entry.state is ConfigEntryState.NOT_LOADED
     entity_state = hass.states.get("light.mock_onoff_light")
     assert entity_state
     assert entity_state.state == STATE_UNAVAILABLE
@@ -168,7 +169,7 @@ async def test_listen_failure_config_entry_not_loaded(
         matter_client.connect.side_effect = MatterError("Boom")
         raise error
 
-    async def get_nodes() -> list[MagicMock]:
+    def get_nodes() -> list[MagicMock]:
         """Mock the client get_nodes method."""
         listen_block.set()
         return []
@@ -209,12 +210,12 @@ async def test_listen_failure_config_entry_loaded(
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
 
-    assert entry.state == ConfigEntryState.LOADED
+    assert entry.state is ConfigEntryState.LOADED
 
     listen_block.set()
     await hass.async_block_till_done()
 
-    assert entry.state == ConfigEntryState.SETUP_RETRY
+    assert entry.state is ConfigEntryState.SETUP_RETRY
     assert matter_client.disconnect.call_count == 1
 
 
@@ -612,8 +613,10 @@ async def test_remove_entry(
 @pytest.mark.parametrize("expected_lingering_tasks", [True])
 async def test_remove_config_entry_device(
     hass: HomeAssistant,
+    device_registry: dr.DeviceRegistry,
+    entity_registry: er.EntityRegistry,
     matter_client: MagicMock,
-    hass_ws_client: Callable[[HomeAssistant], Awaitable[ClientWebSocketResponse]],
+    hass_ws_client: WebSocketGenerator,
 ) -> None:
     """Test that a device can be removed ok."""
     assert await async_setup_component(hass, "config", {})
@@ -621,11 +624,9 @@ async def test_remove_config_entry_device(
     await hass.async_block_till_done()
 
     config_entry = hass.config_entries.async_entries(DOMAIN)[0]
-    device_registry = dr.async_get(hass)
     device_entry = dr.async_entries_for_config_entry(
         device_registry, config_entry.entry_id
     )[0]
-    entity_registry = er.async_get(hass)
     entity_id = "light.m5stamp_lighting_app"
 
     assert device_entry
@@ -654,14 +655,14 @@ async def test_remove_config_entry_device(
 @pytest.mark.parametrize("expected_lingering_tasks", [True])
 async def test_remove_config_entry_device_no_node(
     hass: HomeAssistant,
+    device_registry: dr.DeviceRegistry,
     matter_client: MagicMock,
     integration: MockConfigEntry,
-    hass_ws_client: Callable[[HomeAssistant], Awaitable[ClientWebSocketResponse]],
+    hass_ws_client: WebSocketGenerator,
 ) -> None:
     """Test that a device can be removed ok without an existing node."""
     assert await async_setup_component(hass, "config", {})
     config_entry = integration
-    device_registry = dr.async_get(hass)
     device_entry = device_registry.async_get_or_create(
         config_entry_id=config_entry.entry_id,
         identifiers={

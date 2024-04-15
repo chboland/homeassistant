@@ -1,4 +1,5 @@
 """Test the SFR Box setup process."""
+
 from collections.abc import Generator
 from unittest.mock import patch
 
@@ -17,7 +18,7 @@ def override_platforms() -> Generator[None, None, None]:
         yield
 
 
-@pytest.mark.usefixtures("system_get_info", "dsl_get_info")
+@pytest.mark.usefixtures("system_get_info", "dsl_get_info", "wan_get_info")
 async def test_setup_unload_entry(
     hass: HomeAssistant, config_entry: ConfigEntry
 ) -> None:

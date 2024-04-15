@@ -1,4 +1,5 @@
 """Tests for the logbook component."""
+
 from __future__ import annotations
 
 import json
@@ -29,7 +30,7 @@ class MockRow:
     ):
         """Init the fake row."""
         self.event_type = event_type
-        self.shared_data = json.dumps(data, cls=JSONEncoder)
+        self.event_data = json.dumps(data, cls=JSONEncoder)
         self.data = data
         self.time_fired = dt_util.utcnow()
         self.time_fired_ts = dt_util.utc_to_timestamp(self.time_fired)
@@ -42,8 +43,7 @@ class MockRow:
         self.context_id_bin = ulid_to_bytes_or_none(context.id) if context else None
         self.state = None
         self.entity_id = None
-        self.state_id = None
-        self.event_id = None
+        self.row_id = None
         self.shared_attrs = None
         self.attributes = None
         self.context_only = False
@@ -64,7 +64,7 @@ def mock_humanify(hass_, rows):
     entity_name_cache = processor.EntityNameCache(hass_)
     ent_reg = er.async_get(hass_)
     event_cache = processor.EventCache({})
-    context_lookup = processor.ContextLookup(hass_)
+    context_lookup = {}
     logbook_config = hass_.data.get(logbook.DOMAIN, LogbookConfig({}, None, None))
     external_events = logbook_config.external_events
     logbook_run = processor.LogbookRun(
@@ -78,6 +78,7 @@ def mock_humanify(hass_, rows):
     context_augmenter = processor.ContextAugmenter(logbook_run)
     return list(
         processor._humanify(
+            hass_,
             rows,
             ent_reg,
             logbook_run,

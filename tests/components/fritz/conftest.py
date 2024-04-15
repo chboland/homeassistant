@@ -1,4 +1,5 @@
 """Common stuff for Fritz!Tools tests."""
+
 import logging
 from unittest.mock import MagicMock, patch
 
@@ -6,7 +7,12 @@ from fritzconnection.core.processor import Service
 from fritzconnection.lib.fritzhosts import FritzHosts
 import pytest
 
-from .const import MOCK_FB_SERVICES, MOCK_MESH_DATA, MOCK_MODELNAME
+from .const import (
+    MOCK_FB_SERVICES,
+    MOCK_HOST_ATTRIBUTES_DATA,
+    MOCK_MESH_DATA,
+    MOCK_MODELNAME,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +27,7 @@ class FritzServiceMock(Service):
         self.serviceId = serviceId
 
 
-class FritzConnectionMock:  # pylint: disable=too-few-public-methods
+class FritzConnectionMock:
     """FritzConnection mocking."""
 
     def __init__(self, services):
@@ -42,6 +48,10 @@ class FritzConnectionMock:  # pylint: disable=too-few-public-methods
             self.call_action = MagicMock(side_effect=side_effect)
         else:
             self.call_action = self._call_action
+
+    def override_services(self, services) -> None:
+        """Overrire services data."""
+        self._services = services
 
     def _call_action(self, service: str, action: str, **kwargs):
         LOGGER.debug(
@@ -67,9 +77,11 @@ class FritzConnectionMock:  # pylint: disable=too-few-public-methods
 class FritzHostMock(FritzHosts):
     """FritzHosts mocking."""
 
-    def get_mesh_topology(self, raw=False):
-        """Retrurn mocked mesh data."""
-        return MOCK_MESH_DATA
+    get_mesh_topology = MagicMock()
+    get_mesh_topology.return_value = MOCK_MESH_DATA
+
+    get_hosts_attributes = MagicMock()
+    get_hosts_attributes.return_value = MOCK_HOST_ATTRIBUTES_DATA
 
 
 @pytest.fixture(name="fc_data")

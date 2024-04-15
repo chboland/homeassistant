@@ -1,4 +1,8 @@
 """Tests for the intent helpers."""
+
+import asyncio
+from unittest.mock import MagicMock, patch
+
 import pytest
 import voluptuous as vol
 
@@ -11,9 +15,12 @@ from homeassistant.helpers import (
     config_validation as cv,
     device_registry as dr,
     entity_registry as er,
+    floor_registry as fr,
     intent,
 )
 from homeassistant.setup import async_setup_component
+
+from tests.common import MockConfigEntry
 
 
 class MockIntentHandler(intent.IntentHandler):
@@ -28,11 +35,24 @@ async def test_async_match_states(
     hass: HomeAssistant,
     area_registry: ar.AreaRegistry,
     entity_registry: er.EntityRegistry,
+    floor_registry: fr.FloorRegistry,
 ) -> None:
     """Test async_match_state helper."""
     area_kitchen = area_registry.async_get_or_create("kitchen")
-    area_registry.async_update(area_kitchen.id, aliases={"food room"})
+    area_kitchen = area_registry.async_update(area_kitchen.id, aliases={"food room"})
     area_bedroom = area_registry.async_get_or_create("bedroom")
+
+    # Kitchen is on the first floor
+    floor_1 = floor_registry.async_create("first floor", aliases={"ground floor"})
+    area_kitchen = area_registry.async_update(
+        area_kitchen.id, floor_id=floor_1.floor_id
+    )
+
+    # Bedroom is on the second floor
+    floor_2 = floor_registry.async_create("second floor")
+    area_bedroom = area_registry.async_update(
+        area_bedroom.id, floor_id=floor_2.floor_id
+    )
 
     state1 = State(
         "light.kitchen", "on", attributes={ATTR_FRIENDLY_NAME: "kitchen light"}
@@ -88,6 +108,13 @@ async def test_async_match_states(
         )
     )
 
+    # Invalid area
+    assert not list(
+        intent.async_match_states(
+            hass, area_name="invalid area", states=[state1, state2]
+        )
+    )
+
     # Domain + area
     assert list(
         intent.async_match_states(
@@ -105,6 +132,35 @@ async def test_async_match_states(
         )
     ) == [state2]
 
+    # Floor
+    assert list(
+        intent.async_match_states(
+            hass, floor_name="first floor", states=[state1, state2]
+        )
+    ) == [state1]
+
+    assert list(
+        intent.async_match_states(
+            # Check alias
+            hass,
+            floor_name="ground floor",
+            states=[state1, state2],
+        )
+    ) == [state1]
+
+    assert list(
+        intent.async_match_states(
+            hass, floor_name="second floor", states=[state1, state2]
+        )
+    ) == [state2]
+
+    # Invalid floor
+    assert not list(
+        intent.async_match_states(
+            hass, floor_name="invalid floor", states=[state1, state2]
+        )
+    )
+
 
 async def test_match_device_area(
     hass: HomeAssistant,
@@ -113,11 +169,15 @@ async def test_match_device_area(
     entity_registry: er.EntityRegistry,
 ) -> None:
     """Test async_match_state with a device in an area."""
+    config_entry = MockConfigEntry()
+    config_entry.add_to_hass(hass)
     area_kitchen = area_registry.async_get_or_create("kitchen")
     area_bedroom = area_registry.async_get_or_create("bedroom")
 
     kitchen_device = device_registry.async_get_or_create(
-        config_entry_id="1234", connections=set(), identifiers={("demo", "id-1234")}
+        config_entry_id=config_entry.entry_id,
+        connections=set(),
+        identifiers={("demo", "id-1234")},
     )
     device_registry.async_update_device(kitchen_device.id, area_id=area_kitchen.id)
 
@@ -167,6 +227,14 @@ def test_async_validate_slots() -> None:
     )
 
 
+def test_async_validate_slots_no_schema() -> None:
+    """Test async_validate_slots of IntentHandler with no schema."""
+    handler1 = MockIntentHandler(None)
+    assert handler1.async_validate_slots({"name": {"value": "kitchen"}}) == {
+        "name": {"value": "kitchen"}
+    }
+
+
 async def test_cant_turn_on_lock(hass: HomeAssistant) -> None:
     """Test that we can't turn on entities that don't support it."""
     assert await async_setup_component(hass, "homeassistant", {})
@@ -183,4 +251,126 @@ async def test_cant_turn_on_lock(hass: HomeAssistant) -> None:
     )
 
     assert result.response.response_type == intent.IntentResponseType.ERROR
-    assert result.response.error_code == intent.IntentResponseErrorCode.NO_INTENT_MATCH
+    assert result.response.error_code == intent.IntentResponseErrorCode.NO_VALID_TARGETS
+
+
+def test_async_register(hass: HomeAssistant) -> None:
+    """Test registering an intent and verifying it is stored correctly."""
+    handler = MagicMock()
+    handler.intent_type = "test_intent"
+
+    intent.async_register(hass, handler)
+
+    assert hass.data[intent.DATA_KEY]["test_intent"] == handler
+
+
+def test_async_register_overwrite(hass: HomeAssistant) -> None:
+    """Test registering multiple intents with the same type, ensuring the last one overwrites the previous one and a warning is emitted."""
+    handler1 = MagicMock()
+    handler1.intent_type = "test_intent"
+
+    handler2 = MagicMock()
+    handler2.intent_type = "test_intent"
+
+    with patch.object(intent._LOGGER, "warning") as mock_warning:
+        intent.async_register(hass, handler1)
+        intent.async_register(hass, handler2)
+
+        mock_warning.assert_called_once_with(
+            "Intent %s is being overwritten by %s", "test_intent", handler2
+        )
+
+    assert hass.data[intent.DATA_KEY]["test_intent"] == handler2
+
+
+def test_async_remove(hass: HomeAssistant) -> None:
+    """Test removing an intent and verifying it is no longer present in the Home Assistant data."""
+    handler = MagicMock()
+    handler.intent_type = "test_intent"
+
+    intent.async_register(hass, handler)
+    intent.async_remove(hass, "test_intent")
+
+    assert "test_intent" not in hass.data[intent.DATA_KEY]
+
+
+def test_async_remove_no_existing_entry(hass: HomeAssistant) -> None:
+    """Test the removal of a non-existing intent from Home Assistant's data."""
+    handler = MagicMock()
+    handler.intent_type = "test_intent"
+    intent.async_register(hass, handler)
+
+    intent.async_remove(hass, "test_intent2")
+
+    assert "test_intent2" not in hass.data[intent.DATA_KEY]
+
+
+def test_async_remove_no_existing(hass: HomeAssistant) -> None:
+    """Test the removal of an intent where no config exists."""
+
+    intent.async_remove(hass, "test_intent2")
+    # simply shouldn't cause an exception
+
+    assert intent.DATA_KEY not in hass.data
+
+
+async def test_validate_then_run_in_background(hass: HomeAssistant) -> None:
+    """Test we don't execute a service in foreground forever."""
+    hass.states.async_set("light.kitchen", "off")
+    call_done = asyncio.Event()
+    calls = []
+
+    # Register a service that takes 0.1 seconds to execute
+    async def mock_service(call):
+        """Mock service."""
+        await asyncio.sleep(0.1)
+        call_done.set()
+        calls.append(call)
+
+    hass.services.async_register("light", "turn_on", mock_service)
+
+    # Create intent handler with a service timeout of 0.05 seconds
+    handler = intent.ServiceIntentHandler(
+        "TestType", "light", "turn_on", "Turned {} on"
+    )
+    handler.service_timeout = 0.05
+    intent.async_register(hass, handler)
+
+    result = await intent.async_handle(
+        hass,
+        "test",
+        "TestType",
+        slots={"name": {"value": "kitchen"}},
+    )
+
+    assert result.response_type == intent.IntentResponseType.ACTION_DONE
+
+    assert not call_done.is_set()
+    await call_done.wait()
+
+    assert len(calls) == 1
+    assert calls[0].data == {"entity_id": "light.kitchen"}
+
+
+async def test_invalid_area_floor_names(hass: HomeAssistant) -> None:
+    """Test that we throw an intent handle error with invalid area/floor names."""
+    handler = intent.ServiceIntentHandler(
+        "TestType", "light", "turn_on", "Turned {} on"
+    )
+    intent.async_register(hass, handler)
+
+    with pytest.raises(intent.IntentHandleError):
+        await intent.async_handle(
+            hass,
+            "test",
+            "TestType",
+            slots={"area": {"value": "invalid area"}},
+        )
+
+    with pytest.raises(intent.IntentHandleError):
+        await intent.async_handle(
+            hass,
+            "test",
+            "TestType",
+            slots={"floor": {"value": "invalid floor"}},
+        )

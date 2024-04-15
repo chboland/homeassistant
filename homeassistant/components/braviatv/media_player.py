@@ -1,6 +1,8 @@
 """Media player support for Bravia TV integration."""
+
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from homeassistant.components.media_player import (
@@ -40,6 +42,7 @@ async def async_setup_entry(
 class BraviaTVMediaPlayer(BraviaTVEntity, MediaPlayerEntity):
     """Representation of a Bravia TV Media Player."""
 
+    _attr_name = None
     _attr_assumed_state = True
     _attr_device_class = MediaPlayerDeviceClass.TV
     _attr_supported_features = (
@@ -110,6 +113,16 @@ class BraviaTVMediaPlayer(BraviaTVEntity, MediaPlayerEntity):
         """Duration of current playing media in seconds."""
         return self.coordinator.media_duration
 
+    @property
+    def media_position(self) -> int | None:
+        """Position of current playing media in seconds."""
+        return self.coordinator.media_position
+
+    @property
+    def media_position_updated_at(self) -> datetime | None:
+        """When was the position of the current playing media valid."""
+        return self.coordinator.media_position_updated_at
+
     async def async_turn_on(self) -> None:
         """Turn the device on."""
         await self.coordinator.async_turn_on()
@@ -136,7 +149,7 @@ class BraviaTVMediaPlayer(BraviaTVEntity, MediaPlayerEntity):
 
     async def async_browse_media(
         self,
-        media_content_type: str | None = None,
+        media_content_type: MediaType | str | None = None,
         media_content_id: str | None = None,
     ) -> BrowseMedia:
         """Browse apps and channels."""
@@ -231,7 +244,7 @@ class BraviaTVMediaPlayer(BraviaTVEntity, MediaPlayerEntity):
 
     async def async_get_browse_image(
         self,
-        media_content_type: str,
+        media_content_type: MediaType | str,
         media_content_id: str,
         media_image_id: str | None = None,
     ) -> tuple[bytes | None, str | None]:

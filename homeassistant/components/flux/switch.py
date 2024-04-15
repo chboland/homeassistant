@@ -2,6 +2,7 @@
 
 The idea was taken from https://github.com/KpaBap/hue-flux/
 """
+
 from __future__ import annotations
 
 import datetime
@@ -225,6 +226,12 @@ class FluxSwitch(SwitchEntity, RestoreEntity):
         last_state = await self.async_get_last_state()
         if last_state and last_state.state == STATE_ON:
             await self.async_turn_on()
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Run when entity will be removed from hass."""
+        if self.unsub_tracker:
+            self.unsub_tracker()
+        return await super().async_will_remove_from_hass()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on flux."""

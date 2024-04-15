@@ -1,4 +1,5 @@
 """The tests for the microsoft face detect platform."""
+
 from unittest.mock import PropertyMock, patch
 
 import pytest
@@ -24,6 +25,12 @@ CONFIG = {
 }
 
 ENDPOINT_URL = f"https://westus.{mf.FACE_API_URL}"
+
+
+@pytest.fixture(autouse=True)
+async def setup_homeassistant(hass: HomeAssistant):
+    """Set up the homeassistant integration."""
+    await async_setup_component(hass, "homeassistant", {})
 
 
 @pytest.fixture
@@ -90,15 +97,15 @@ async def test_ms_detect_process_image(
     """Set up and scan a picture and test plates from event."""
     aioclient_mock.get(
         ENDPOINT_URL.format("persongroups"),
-        text=load_fixture("microsoft_face_persongroups.json"),
+        text=load_fixture("persongroups.json", "microsoft_face_detect"),
     )
     aioclient_mock.get(
         ENDPOINT_URL.format("persongroups/test_group1/persons"),
-        text=load_fixture("microsoft_face_persons.json"),
+        text=load_fixture("persons.json", "microsoft_face_detect"),
     )
     aioclient_mock.get(
         ENDPOINT_URL.format("persongroups/test_group2/persons"),
-        text=load_fixture("microsoft_face_persons.json"),
+        text=load_fixture("persons.json", "microsoft_face_detect"),
     )
 
     await async_setup_component(hass, ip.DOMAIN, CONFIG)
@@ -120,7 +127,7 @@ async def test_ms_detect_process_image(
 
     aioclient_mock.post(
         ENDPOINT_URL.format("detect"),
-        text=load_fixture("microsoft_face_detect.json"),
+        text=load_fixture("detect.json", "microsoft_face_detect"),
         params={"returnFaceAttributes": "age,gender"},
     )
 

@@ -1,5 +1,9 @@
 """Test the Aladdin Connect Cover."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
+
+from AIOAladdinConnect import session_manager
+import pytest
 
 from homeassistant.components.aladdin_connect.const import DOMAIN
 from homeassistant.components.aladdin_connect.cover import SCAN_INTERVAL
@@ -13,9 +17,11 @@ from homeassistant.const import (
     STATE_CLOSING,
     STATE_OPEN,
     STATE_OPENING,
+    STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.setup import async_setup_component
 from homeassistant.util.dt import utcnow
 
@@ -97,8 +103,10 @@ async def test_cover_operation(
 
     assert await async_setup_component(hass, "homeassistant", {})
     await hass.async_block_till_done()
+
     mock_aladdinconnect_api.async_get_door_status = AsyncMock(return_value=STATE_OPEN)
     mock_aladdinconnect_api.get_door_status.return_value = STATE_OPEN
+
     with patch(
         "homeassistant.components.aladdin_connect.AladdinConnectClient",
         return_value=mock_aladdinconnect_api,
@@ -106,7 +114,7 @@ async def test_cover_operation(
         await hass.config_entries.async_setup(config_entry.entry_id)
         await hass.async_block_till_done()
 
-    assert config_entry.state == ConfigEntryState.LOADED
+    assert config_entry.state is ConfigEntryState.LOADED
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1
     assert COVER_DOMAIN in hass.config.components
 
@@ -116,44 +124,57 @@ async def test_cover_operation(
         {ATTR_ENTITY_ID: "cover.home"},
         blocking=True,
     )
-    await hass.async_block_till_done()
     assert hass.states.get("cover.home").state == STATE_OPEN
+
+    mock_aladdinconnect_api.open_door.return_value = False
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            COVER_DOMAIN,
+            SERVICE_OPEN_COVER,
+            {ATTR_ENTITY_ID: "cover.home"},
+            blocking=True,
+        )
+
+    mock_aladdinconnect_api.open_door.return_value = True
 
     mock_aladdinconnect_api.async_get_door_status = AsyncMock(return_value=STATE_CLOSED)
     mock_aladdinconnect_api.get_door_status.return_value = STATE_CLOSED
-    with patch(
-        "homeassistant.components.aladdin_connect.AladdinConnectClient",
-        return_value=mock_aladdinconnect_api,
-    ):
+
+    await hass.services.async_call(
+        COVER_DOMAIN,
+        SERVICE_CLOSE_COVER,
+        {ATTR_ENTITY_ID: "cover.home"},
+        blocking=True,
+    )
+    async_fire_time_changed(
+        hass,
+        utcnow() + SCAN_INTERVAL,
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get("cover.home").state == STATE_CLOSED
+
+    mock_aladdinconnect_api.close_door.return_value = False
+    with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
             COVER_DOMAIN,
             SERVICE_CLOSE_COVER,
             {ATTR_ENTITY_ID: "cover.home"},
             blocking=True,
         )
-        await hass.async_block_till_done()
-        async_fire_time_changed(
-            hass,
-            utcnow() + SCAN_INTERVAL,
-        )
-        await hass.async_block_till_done()
 
-    assert hass.states.get("cover.home").state == STATE_CLOSED
+    mock_aladdinconnect_api.close_door.return_value = True
 
     mock_aladdinconnect_api.async_get_door_status = AsyncMock(
         return_value=STATE_CLOSING
     )
     mock_aladdinconnect_api.get_door_status.return_value = STATE_CLOSING
 
-    with patch(
-        "homeassistant.components.aladdin_connect.AladdinConnectClient",
-        return_value=mock_aladdinconnect_api,
-    ):
-        async_fire_time_changed(
-            hass,
-            utcnow() + SCAN_INTERVAL,
-        )
-        await hass.async_block_till_done()
+    async_fire_time_changed(
+        hass,
+        utcnow() + SCAN_INTERVAL,
+    )
+    await hass.async_block_till_done()
     assert hass.states.get("cover.home").state == STATE_CLOSING
 
     mock_aladdinconnect_api.async_get_door_status = AsyncMock(
@@ -161,34 +182,47 @@ async def test_cover_operation(
     )
     mock_aladdinconnect_api.get_door_status.return_value = STATE_OPENING
 
-    with patch(
-        "homeassistant.components.aladdin_connect.AladdinConnectClient",
-        return_value=mock_aladdinconnect_api,
-    ):
-        async_fire_time_changed(
-            hass,
-            utcnow() + SCAN_INTERVAL,
-        )
-        await hass.async_block_till_done()
+    async_fire_time_changed(
+        hass,
+        utcnow() + SCAN_INTERVAL,
+    )
+    await hass.async_block_till_done()
     assert hass.states.get("cover.home").state == STATE_OPENING
 
     mock_aladdinconnect_api.async_get_door_status = AsyncMock(return_value=None)
     mock_aladdinconnect_api.get_door_status.return_value = None
-    with patch(
-        "homeassistant.components.aladdin_connect.AladdinConnectClient",
-        return_value=mock_aladdinconnect_api,
-    ):
-        await hass.services.async_call(
-            COVER_DOMAIN,
-            SERVICE_CLOSE_COVER,
-            {ATTR_ENTITY_ID: "cover.home"},
-            blocking=True,
-        )
-        await hass.async_block_till_done()
-        async_fire_time_changed(
-            hass,
-            utcnow() + SCAN_INTERVAL,
-        )
-        await hass.async_block_till_done()
+
+    await hass.services.async_call(
+        COVER_DOMAIN,
+        SERVICE_CLOSE_COVER,
+        {ATTR_ENTITY_ID: "cover.home"},
+        blocking=True,
+    )
+    async_fire_time_changed(
+        hass,
+        utcnow() + SCAN_INTERVAL,
+    )
+    await hass.async_block_till_done()
 
     assert hass.states.get("cover.home").state == STATE_UNKNOWN
+
+    mock_aladdinconnect_api.get_doors.side_effect = session_manager.ConnectionError
+
+    async_fire_time_changed(
+        hass,
+        utcnow() + SCAN_INTERVAL,
+    )
+    await hass.async_block_till_done()
+
+    assert hass.states.get("cover.home").state == STATE_UNAVAILABLE
+
+    mock_aladdinconnect_api.get_doors.side_effect = session_manager.InvalidPasswordError
+    mock_aladdinconnect_api.login.return_value = False
+    mock_aladdinconnect_api.login.side_effect = session_manager.InvalidPasswordError
+
+    async_fire_time_changed(
+        hass,
+        utcnow() + SCAN_INTERVAL,
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get("cover.home").state == STATE_UNAVAILABLE

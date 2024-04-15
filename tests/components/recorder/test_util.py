@@ -1,14 +1,14 @@
 """Test util methods."""
+
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 import os
 from pathlib import Path
 import sqlite3
 from unittest.mock import MagicMock, Mock, patch
 
-from freezegun import freeze_time
 import pytest
-from sqlalchemy import text
+from sqlalchemy import lambda_stmt, text
 from sqlalchemy.engine.result import ChunkedIteratorResult
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql.elements import TextClause
@@ -19,13 +19,14 @@ from homeassistant.components.recorder import util
 from homeassistant.components.recorder.const import DOMAIN, SQLITE_URL_PREFIX
 from homeassistant.components.recorder.db_schema import RecorderRuns
 from homeassistant.components.recorder.history.modern import (
-    _get_single_entity_states_stmt,
+    _get_single_entity_start_time_stmt,
 )
 from homeassistant.components.recorder.models import (
     UnsupportedDialect,
     process_timestamp,
 )
 from homeassistant.components.recorder.util import (
+    chunked_or_all,
     end_incomplete_runs,
     is_second_sunday,
     resolve_period,
@@ -45,9 +46,11 @@ from tests.typing import RecorderInstanceGenerator
 def test_session_scope_not_setup(hass_recorder: Callable[..., HomeAssistant]) -> None:
     """Try to create a session scope when not setup."""
     hass = hass_recorder()
-    with patch.object(
-        util.get_instance(hass), "get_session", return_value=None
-    ), pytest.raises(RuntimeError), util.session_scope(hass=hass):
+    with (
+        patch.object(util.get_instance(hass), "get_session", return_value=None),
+        pytest.raises(RuntimeError),
+        util.session_scope(hass=hass),
+    ):
         pass
 
 
@@ -59,25 +62,26 @@ def test_recorder_bad_execute(hass_recorder: Callable[..., HomeAssistant]) -> No
 
     def to_native(validate_entity_id=True):
         """Raise exception."""
-        raise SQLAlchemyError()
+        raise SQLAlchemyError
 
     mck1 = MagicMock()
     mck1.to_native = to_native
 
-    with pytest.raises(SQLAlchemyError), patch(
-        "homeassistant.components.recorder.core.time.sleep"
-    ) as e_mock:
+    with (
+        pytest.raises(SQLAlchemyError),
+        patch("homeassistant.components.recorder.core.time.sleep") as e_mock,
+    ):
         util.execute((mck1,), to_native=True)
 
     assert e_mock.call_count == 2
 
 
 def test_validate_or_move_away_sqlite_database(
-    hass: HomeAssistant, tmpdir, caplog: pytest.LogCaptureFixture
+    hass: HomeAssistant, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """Ensure a malformed sqlite database is moved away."""
-
-    test_dir = tmpdir.mkdir("test_validate_or_move_away_sqlite_database")
+    test_dir = tmp_path.joinpath("test_validate_or_move_away_sqlite_database")
+    test_dir.mkdir()
     test_db_file = f"{test_dir}/broken.db"
     dburl = f"{SQLITE_URL_PREFIX}{test_db_file}"
 
@@ -99,67 +103,69 @@ def test_validate_or_move_away_sqlite_database(
 
 
 async def test_last_run_was_recently_clean(
-    event_loop, async_setup_recorder_instance: RecorderInstanceGenerator, tmp_path: Path
+    async_setup_recorder_instance: RecorderInstanceGenerator, tmp_path: Path
 ) -> None:
     """Test we can check if the last recorder run was recently clean."""
     config = {
         recorder.CONF_DB_URL: "sqlite:///" + str(tmp_path / "pytest.db"),
         recorder.CONF_COMMIT_INTERVAL: 1,
     }
-    hass = await async_test_home_assistant(None)
+    async with async_test_home_assistant() as hass:
+        return_values = []
+        real_last_run_was_recently_clean = util.last_run_was_recently_clean
 
-    return_values = []
-    real_last_run_was_recently_clean = util.last_run_was_recently_clean
+        def _last_run_was_recently_clean(cursor):
+            return_values.append(real_last_run_was_recently_clean(cursor))
+            return return_values[-1]
 
-    def _last_run_was_recently_clean(cursor):
-        return_values.append(real_last_run_was_recently_clean(cursor))
-        return return_values[-1]
+        # Test last_run_was_recently_clean is not called on new DB
+        with patch(
+            "homeassistant.components.recorder.util.last_run_was_recently_clean",
+            wraps=_last_run_was_recently_clean,
+        ) as last_run_was_recently_clean_mock:
+            await async_setup_recorder_instance(hass, config)
+            await hass.async_block_till_done()
+            last_run_was_recently_clean_mock.assert_not_called()
 
-    # Test last_run_was_recently_clean is not called on new DB
-    with patch(
-        "homeassistant.components.recorder.util.last_run_was_recently_clean",
-        wraps=_last_run_was_recently_clean,
-    ) as last_run_was_recently_clean_mock:
-        await async_setup_recorder_instance(hass, config)
+        # Restart HA, last_run_was_recently_clean should return True
+        hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
         await hass.async_block_till_done()
-        last_run_was_recently_clean_mock.assert_not_called()
+        await hass.async_stop()
 
-    # Restart HA, last_run_was_recently_clean should return True
-    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
-    await hass.async_block_till_done()
-    await hass.async_stop()
+    async with async_test_home_assistant() as hass:
+        with patch(
+            "homeassistant.components.recorder.util.last_run_was_recently_clean",
+            wraps=_last_run_was_recently_clean,
+        ) as last_run_was_recently_clean_mock:
+            await async_setup_recorder_instance(hass, config)
+            last_run_was_recently_clean_mock.assert_called_once()
+            assert return_values[-1] is True
 
-    with patch(
-        "homeassistant.components.recorder.util.last_run_was_recently_clean",
-        wraps=_last_run_was_recently_clean,
-    ) as last_run_was_recently_clean_mock:
-        hass = await async_test_home_assistant(None)
-        await async_setup_recorder_instance(hass, config)
-        last_run_was_recently_clean_mock.assert_called_once()
-        assert return_values[-1] is True
-
-    # Restart HA with a long downtime, last_run_was_recently_clean should return False
-    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
-    await hass.async_block_till_done()
-    await hass.async_stop()
+        # Restart HA with a long downtime, last_run_was_recently_clean should return False
+        hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+        await hass.async_block_till_done()
+        await hass.async_stop()
 
     thirty_min_future_time = dt_util.utcnow() + timedelta(minutes=30)
 
-    with patch(
-        "homeassistant.components.recorder.util.last_run_was_recently_clean",
-        wraps=_last_run_was_recently_clean,
-    ) as last_run_was_recently_clean_mock, patch(
-        "homeassistant.components.recorder.core.dt_util.utcnow",
-        return_value=thirty_min_future_time,
-    ):
-        hass = await async_test_home_assistant(None)
-        await async_setup_recorder_instance(hass, config)
-        last_run_was_recently_clean_mock.assert_called_once()
-        assert return_values[-1] is False
+    async with async_test_home_assistant() as hass:
+        with (
+            patch(
+                "homeassistant.components.recorder.util.last_run_was_recently_clean",
+                wraps=_last_run_was_recently_clean,
+            ) as last_run_was_recently_clean_mock,
+            patch(
+                "homeassistant.components.recorder.core.dt_util.utcnow",
+                return_value=thirty_min_future_time,
+            ),
+        ):
+            await async_setup_recorder_instance(hass, config)
+            last_run_was_recently_clean_mock.assert_called_once()
+            assert return_values[-1] is False
 
-    hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
-    await hass.async_block_till_done()
-    await hass.async_stop()
+        hass.bus.async_fire(EVENT_HOMEASSISTANT_STOP)
+        await hass.async_block_till_done()
+        await hass.async_stop()
 
 
 @pytest.mark.parametrize(
@@ -752,17 +758,23 @@ def test_combined_checks(
         assert "restarted cleanly and passed the basic sanity check" in caplog.text
 
     caplog.clear()
-    with patch(
-        "homeassistant.components.recorder.util.last_run_was_recently_clean",
-        side_effect=sqlite3.DatabaseError,
-    ), pytest.raises(sqlite3.DatabaseError):
+    with (
+        patch(
+            "homeassistant.components.recorder.util.last_run_was_recently_clean",
+            side_effect=sqlite3.DatabaseError,
+        ),
+        pytest.raises(sqlite3.DatabaseError),
+    ):
         util.run_checks_on_open_db("fake_db_path", cursor)
 
     caplog.clear()
-    with patch(
-        "homeassistant.components.recorder.util.last_run_was_recently_clean",
-        side_effect=sqlite3.DatabaseError,
-    ), pytest.raises(sqlite3.DatabaseError):
+    with (
+        patch(
+            "homeassistant.components.recorder.util.last_run_was_recently_clean",
+            side_effect=sqlite3.DatabaseError,
+        ),
+        pytest.raises(sqlite3.DatabaseError),
+    ):
         util.run_checks_on_open_db("fake_db_path", cursor)
 
     cursor.execute("DROP TABLE events;")
@@ -883,7 +895,7 @@ def test_build_mysqldb_conv() -> None:
 
 @patch("homeassistant.components.recorder.util.QUERY_RETRY_WAIT", 0)
 def test_execute_stmt_lambda_element(
-    hass_recorder: Callable[..., HomeAssistant]
+    hass_recorder: Callable[..., HomeAssistant],
 ) -> None:
     """Test executing with execute_stmt_lambda_element."""
     hass = hass_recorder()
@@ -894,22 +906,28 @@ def test_execute_stmt_lambda_element(
     now = dt_util.utcnow()
     tomorrow = now + timedelta(days=1)
     one_week_from_now = now + timedelta(days=7)
+    all_calls = 0
 
     class MockExecutor:
         def __init__(self, stmt):
             assert isinstance(stmt, StatementLambdaElement)
-            self.calls = 0
 
         def all(self):
-            self.calls += 1
-            if self.calls == 2:
+            nonlocal all_calls
+            all_calls += 1
+            if all_calls == 2:
                 return ["mock_row"]
             raise SQLAlchemyError
 
     with session_scope(hass=hass) as session:
         # No time window, we always get a list
-        metadata_id = instance.states_meta_manager.get("sensor.on", session)
-        stmt = _get_single_entity_states_stmt(dt_util.utcnow(), metadata_id, False)
+        metadata_id = instance.states_meta_manager.get("sensor.on", session, True)
+        start_time_ts = dt_util.utcnow().timestamp()
+        stmt = lambda_stmt(
+            lambda: _get_single_entity_start_time_stmt(
+                start_time_ts, metadata_id, False, False, False
+            )
+        )
         rows = util.execute_stmt_lambda_element(session, stmt)
         assert isinstance(rows, list)
         assert rows[0].state == new_state.state
@@ -918,6 +936,16 @@ def test_execute_stmt_lambda_element(
         # Time window >= 2 days, we get a ChunkedIteratorResult
         rows = util.execute_stmt_lambda_element(session, stmt, now, one_week_from_now)
         assert isinstance(rows, ChunkedIteratorResult)
+        row = next(rows)
+        assert row.state == new_state.state
+        assert row.metadata_id == metadata_id
+
+        # Time window >= 2 days, we should not get a ChunkedIteratorResult
+        # because orm_rows=False
+        rows = util.execute_stmt_lambda_element(
+            session, stmt, now, one_week_from_now, orm_rows=False
+        )
+        assert not isinstance(rows, ChunkedIteratorResult)
         row = next(rows)
         assert row.state == new_state.state
         assert row.metadata_id == metadata_id
@@ -933,7 +961,7 @@ def test_execute_stmt_lambda_element(
             assert rows == ["mock_row"]
 
 
-@freeze_time(datetime(2022, 10, 21, 7, 25, tzinfo=timezone.utc))
+@pytest.mark.freeze_time(datetime(2022, 10, 21, 7, 25, tzinfo=UTC))
 async def test_resolve_period(hass: HomeAssistant) -> None:
     """Test statistic_during_period."""
 
@@ -1008,3 +1036,24 @@ async def test_resolve_period(hass: HomeAssistant) -> None:
             }
         }
     ) == (now - timedelta(hours=1, minutes=25), now - timedelta(minutes=25))
+
+
+def test_chunked_or_all():
+    """Test chunked_or_all can iterate chunk sizes larger than the passed in collection."""
+    all = []
+    incoming = (1, 2, 3, 4)
+    for chunk in chunked_or_all(incoming, 2):
+        assert len(chunk) == 2
+        all.extend(chunk)
+    assert all == [1, 2, 3, 4]
+
+    all = []
+    incoming = (1, 2, 3, 4)
+    for chunk in chunked_or_all(incoming, 5):
+        assert len(chunk) == 4
+        # Verify the chunk is the same object as the incoming
+        # collection since we want to avoid copying the collection
+        # if we don't need to
+        assert chunk is incoming
+        all.extend(chunk)
+    assert all == [1, 2, 3, 4]

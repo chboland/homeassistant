@@ -1,4 +1,5 @@
 """Support for Irish Rail RTPI information."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -30,7 +31,7 @@ CONF_DIRECTION = "direction"
 CONF_STOPS_AT = "stops_at"
 
 DEFAULT_NAME = "Next Train"
-ICON = "mdi:train"
+
 
 SCAN_INTERVAL = timedelta(minutes=2)
 TIME_STR_FORMAT = "%H:%M"
@@ -76,6 +77,7 @@ class IrishRailTransportSensor(SensorEntity):
     """Implementation of an irish rail public transport sensor."""
 
     _attr_attribution = "Data provided by Irish Rail"
+    _attr_icon = "mdi:train"
 
     def __init__(self, data, station, direction, destination, stops_at, name):
         """Initialize the sensor."""
@@ -127,11 +129,6 @@ class IrishRailTransportSensor(SensorEntity):
     def native_unit_of_measurement(self):
         """Return the unit this state is expressed in."""
         return UnitOfTime.MINUTES
-
-    @property
-    def icon(self):
-        """Icon to use in the frontend, if any."""
-        return ICON
 
     def update(self) -> None:
         """Get the latest data and update the states."""

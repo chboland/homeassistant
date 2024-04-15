@@ -1,4 +1,5 @@
 """Support for AVM Fritz!Box functions."""
+
 import logging
 
 from homeassistant.config_entries import ConfigEntry
@@ -43,6 +44,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ):
         raise ConfigEntryAuthFailed("Missing UPnP configuration")
 
+    await avm_wrapper.async_config_entry_first_refresh()
+
     hass.data.setdefault(DOMAIN, {})
     hass.data[DOMAIN][entry.entry_id] = avm_wrapper
 
@@ -50,8 +53,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DATA_FRITZ] = FritzData()
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
-
-    await avm_wrapper.async_config_entry_first_refresh()
 
     # Load the other platforms like switch
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

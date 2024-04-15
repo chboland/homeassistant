@@ -1,4 +1,5 @@
 """Platform for binary sensor integration."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -20,7 +21,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import CONNECTED_PLC_DEVICES, CONNECTED_TO_ROUTER, DOMAIN
-from .entity import DevoloEntity
+from .entity import DevoloCoordinatorEntity
 
 
 def _is_connected_to_router(entity: DevoloBinarySensorEntity) -> bool:
@@ -32,18 +33,11 @@ def _is_connected_to_router(entity: DevoloBinarySensorEntity) -> bool:
     )
 
 
-@dataclass
-class DevoloBinarySensorRequiredKeysMixin:
-    """Mixin for required keys."""
+@dataclass(frozen=True, kw_only=True)
+class DevoloBinarySensorEntityDescription(BinarySensorEntityDescription):
+    """Describes devolo sensor entity."""
 
     value_func: Callable[[DevoloBinarySensorEntity], bool]
-
-
-@dataclass
-class DevoloBinarySensorEntityDescription(
-    BinarySensorEntityDescription, DevoloBinarySensorRequiredKeysMixin
-):
-    """Describes devolo sensor entity."""
 
 
 SENSOR_TYPES: dict[str, DevoloBinarySensorEntityDescription] = {
@@ -52,8 +46,6 @@ SENSOR_TYPES: dict[str, DevoloBinarySensorEntityDescription] = {
         device_class=BinarySensorDeviceClass.PLUG,
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
-        icon="mdi:router-network",
-        name="Connected to router",
         value_func=_is_connected_to_router,
     ),
 }
@@ -69,19 +61,20 @@ async def async_setup_entry(
     ]["coordinators"]
 
     entities: list[BinarySensorEntity] = []
-    if device.plcnet:
-        entities.append(
-            DevoloBinarySensorEntity(
-                entry,
-                coordinators[CONNECTED_PLC_DEVICES],
-                SENSOR_TYPES[CONNECTED_TO_ROUTER],
-                device,
-            )
+    entities.append(
+        DevoloBinarySensorEntity(
+            entry,
+            coordinators[CONNECTED_PLC_DEVICES],
+            SENSOR_TYPES[CONNECTED_TO_ROUTER],
+            device,
         )
+    )
     async_add_entities(entities)
 
 
-class DevoloBinarySensorEntity(DevoloEntity[LogicalNetwork], BinarySensorEntity):
+class DevoloBinarySensorEntity(
+    DevoloCoordinatorEntity[LogicalNetwork], BinarySensorEntity
+):
     """Representation of a devolo binary sensor."""
 
     def __init__(
